@@ -1,200 +1,281 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract ReentrancyGuard {
-    uint256 private _status;
-    uint256 private constant _NOT_ENTERED = 1;
-    uint256 private constant _ENTERED = 2;
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-    constructor() {
-        _status = _NOT_ENTERED;
-    }
-
-    modifier nonReentrant() {
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
-        _status = _ENTERED;
-        _;
-        _status = _NOT_ENTERED;
-    }
-}
-
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
-
-contract CosmosXMatrix is ReentrancyGuard {
-    IERC20 public usdcToken;
+contract CosmosXMatrix {
+    IERC20 public usdc;
     address public owner;
-    address public rootUser;
 
-    uint256 public totalSlotPurchases;
-    uint256 public totalEarnings;
-
-    uint256[] public slotPrices = [
-        5e6, 10e6, 20e6, 40e6, 80e6, 160e6,
-        320e6, 640e6, 1280e6, 2560e6, 5120e6, 10240e6
+    uint256[15] public slotPrices = [
+        4e6, 5e6, 10e6, 20e6, 40e6, 80e6, 160e6, 320e6,
+        640e6, 1280e6, 2560e6, 5120e6, 10240e6, 20480e6, 40960e6
     ];
 
     struct User {
         address referrer;
-        uint256[12] slotExpiry;
-        uint256 lastActive;
-        uint256 recycleCount;
         address left;
         address right;
-        uint256 totalEarned;
-        uint256[12] earningsPerSlot;
+        address[] directs;
+        uint256 registeredAt;
+        uint256 activeSlots;
+        bool isFlipped;
+        bool autoUpgrade;
+        uint256 savedForUpgrade;
+        bool exists;
     }
 
     mapping(address => User) public users;
-    mapping(address => uint256) public referralCount;
-    mapping(address => uint256) public totalEarned;
-    mapping(address => mapping(uint256 => uint256)) public slotEarnings;
-    mapping(uint256 => uint256) public slotRoyaltyBalance;
+    mapping(address => mapping(uint256 => bool)) public userSlots;
+    mapping(uint256 => uint256) public royaltyPerSlot;
+    mapping(address => uint256) public totalEarnings;
+
+    event Registered(address indexed user, address indexed referrer);
+    event SlotPurchased(address indexed user, uint256 slot);
+    event Deactivated(address indexed user);
+    event AutoUpgrade(address indexed user, uint256 newSlot);
+
+    constructor(address _usdc) {
+        usdc = IERC20(_usdc);
+        owner = msg.sender;
+
+        users[msg.sender] = User({
+            referrer: address(0),
+            left: address(0),
+            right: address(0),
+            directs: new address[](0),
+            registeredAt: block.timestamp,
+            activeSlots: 15,
+            isFlipped: false,
+            autoUpgrade: false,
+            savedForUpgrade: 0,
+            exists: true
+        });
+
+        for (uint8 i = 1; i <= 15; i++) {
+            userSlots[msg.sender][i] = true;
+        }
+    }
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not admin");
+        require(msg.sender == owner, "Only owner");
         _;
     }
 
-    event Registration(address user, address referrer);
-    event SlotUpgraded(address user, uint256 slot);
-    event IncomeDistributed(address from, address to, uint256 amount, string incomeType);
-    event Recycled(address user, uint256 slot);
-    event IncomeAdded(address user, uint256 amount, string incomeType);
+    function register(address _referrer) external {
+        require(!users[msg.sender].exists, "User exists");
+        require(users[_referrer].exists, "Invalid referrer");
+        require(msg.sender != _referrer, "Cannot refer yourself");
 
-    constructor(address _usdcToken, address _rootUser) {
-        owner = msg.sender;
-        usdcToken = IERC20(_usdcToken);
-        rootUser = _rootUser;
+        address placement = findFreePlacement(_referrer);
 
-        users[_rootUser].referrer = owner;
-        users[_rootUser].lastActive = block.timestamp;
-    }
+        users[msg.sender] = User({
+            referrer: _referrer,
+            left: address(0),
+            right: address(0),
+            directs:  new address[](0) ,
+            registeredAt: block.timestamp,
+            activeSlots: 0,
+            isFlipped: false,
+            autoUpgrade: false,
+            savedForUpgrade: 0,
+            exists: true
+        });
 
-    function register(address referrer) external nonReentrant {
-        require(users[msg.sender].referrer == address(0), "Already registered");
-        require(referrer != address(0), "Invalid referrer");
-        require(msg.sender != referrer, "Cannot refer yourself");
-        require(users[referrer].referrer != address(0) || referrer == owner, "Referrer must exist");
-
-        users[msg.sender].referrer = referrer;
-        users[msg.sender].lastActive = block.timestamp;
-        referralCount[referrer]++;
-
-        _placeUser(referrer, msg.sender);
-
-        emit Registration(msg.sender, referrer);
-    }
-
-    function buySlot(uint256 slot) external nonReentrant {
-        require(slot >= 1 && slot <= 12, "Invalid slot");
-        require(users[msg.sender].referrer != address(0) || msg.sender == owner, "User not registered");
-        uint256 price = slotPrices[slot - 1];
-        usdcToken.transferFrom(msg.sender, address(this), price);
-
-        if (users[msg.sender].slotExpiry[slot - 1] == 0) {
-            users[msg.sender].slotExpiry[slot - 1] = block.timestamp + 14 days;
+        if (users[placement].left == address(0)) {
+            users[placement].left = msg.sender;
         } else {
-            users[msg.sender].slotExpiry[slot - 1] += 14 days;
+            users[placement].right = msg.sender;
         }
 
-        users[msg.sender].lastActive = block.timestamp;
-        totalSlotPurchases++;
-
-        _distributeIncome(msg.sender, slot, price);
-
-        emit SlotUpgraded(msg.sender, slot);
+        users[placement].directs.push(msg.sender);
+        emit Registered(msg.sender, placement);
     }
 
-    function _placeUser(address referrer, address newUser) internal {
-        if (users[referrer].left == address(0)) {
-            users[referrer].left = newUser;
-        } else if (users[referrer].right == address(0)) {
-            users[referrer].right = newUser;
-        } else {
-            if (users[users[referrer].left].left == address(0)) {
-                users[users[referrer].left].left = newUser;
-            } else if (users[users[referrer].right].left == address(0)) {
-                users[users[referrer].right].left = newUser;
-            } else if (users[users[referrer].left].right == address(0)) {
-                users[users[referrer].left].right = newUser;
-            } else if (users[users[referrer].right].right == address(0)) {
-                users[users[referrer].right].right = newUser;
+    function findFreePlacement(address start) public view returns (address) {
+        address[5000] memory queue;
+        uint256 head = 0;
+        uint256 tail = 0;
+        queue[tail++] = start;
+
+        while (head < tail) {
+            address current = queue[head++];
+            if (users[current].left == address(0) || users[current].right == address(0)) {
+                return current;
+            }
+            if (users[current].left != address(0)) queue[tail++] = users[current].left;
+            if (users[current].right != address(0)) queue[tail++] = users[current].right;
+        }
+
+        revert("No free position");
+    }
+
+    function purchaseSlot(uint256 slot) external {
+        require(slot >= 1 && slot <= 15, "Invalid slot");
+        require(users[msg.sender].exists, "User not registered");
+
+        uint256 totalCost = 0;
+        for (uint256 i = 1; i <= slot; i++) {
+            if (!userSlots[msg.sender][i]) {
+                totalCost += slotPrices[i - 1];
+            }
+        }
+
+        require(totalCost > 0, "All slots already purchased");
+        usdc.transferFrom(msg.sender, address(this), totalCost);
+
+        for (uint256 i = 1; i <= slot; i++) {
+            if (!userSlots[msg.sender][i]) {
+                userSlots[msg.sender][i] = true;
+                users[msg.sender].activeSlots++;
+                distributeIncome(msg.sender, i);
+                emit SlotPurchased(msg.sender, i);
             }
         }
     }
 
-    function _distributeIncome(address user, uint256 slot, uint256 amount) internal {
-        address referrer = users[user].referrer;
-        if (referrer == address(0)) referrer = owner;
+    function distributeIncome(address user, uint256 slot) internal {
+        address ref = users[user].referrer;
+        uint256 amount = slotPrices[slot - 1];
+        uint256 directShare = (amount * 70) / 100;
+        uint256 levelShare = (amount * 15) / 100;
+        uint256 royaltyShare = (amount * 15) / 100;
 
-        uint256 referralTotal = referralCount[referrer];
+        // Direct income
+        if (ref != address(0)) {
+            handleIncome(ref, directShare);
+        }
 
-        if (referralTotal == 1) {
-            uint256 toUpline = (amount * 75) / 100;
-            uint256 toRoyalty = (amount * 25) / 100;
-            _payAndRecord(user, referrer, slot, toUpline, "Direct Income");
-            slotRoyaltyBalance[slot] += toRoyalty;
-        } else if (referralTotal >= 2 && referralTotal <= 4) {
-            uint256 half = (amount * 50) / 100;
-            address referrer2 = users[referrer].referrer;
-            if (referrer2 == address(0)) referrer2 = owner;
+        // Level income
+        address upline = ref;
+        for (uint8 i = 0; i < 15 && upline != address(0); i++) {
+            uint256 levelAmount = levelShare / 15;
+            handleIncome(upline, levelAmount);
+            upline = users[upline].referrer;
+        }
 
-            _payAndRecord(user, referrer, slot, half, "Direct Income");
-            _payAndRecord(user, referrer2, slot, half, "Indirect Income");
+        // Royalty
+        royaltyPerSlot[slot] += royaltyShare;
+    }
+
+    function handleIncome(address user, uint256 amount) internal {
+        if (users[user].autoUpgrade) {
+            users[user].savedForUpgrade += amount;
+            tryAutoUpgrade(user);
         } else {
-            uint256 half = (amount * 50) / 100;
-            _payAndRecord(user, referrer, slot, half, "Recycle");
-            _recycle(user, slot);
+            usdc.transfer(user, amount);
+            totalEarnings[user] += amount;
         }
     }
 
-    function _payAndRecord(address from, address to, uint256 slot, uint256 amount, string memory incomeType) internal {
-        usdcToken.transfer(to, amount);
-        totalEarned[to] += amount;
-        slotEarnings[to][slot - 1] += amount;
-        totalEarnings += amount;
+    function tryAutoUpgrade(address user) internal {
+        uint256 currentSlot = users[user].activeSlots;
+        if (currentSlot >= 15) return;
 
-        users[to].totalEarned += amount;
-        users[to].earningsPerSlot[slot - 1] += amount;
-
-        emit IncomeDistributed(from, to, amount, incomeType);
-        emit IncomeAdded(to, amount, incomeType);
+        uint256 nextSlotPrice = slotPrices[currentSlot];
+        if (users[user].savedForUpgrade >= nextSlotPrice) {
+            users[user].savedForUpgrade -= nextSlotPrice;
+            users[user].activeSlots++;
+            userSlots[user][currentSlot + 1] = true;
+            distributeIncome(user, currentSlot + 1);
+            emit AutoUpgrade(user, currentSlot + 1);
+        }
     }
 
-    function _directReferrals(address userAddr) internal view returns (uint256 count) {
-        if (users[userAddr].left != address(0)) count++;
-        if (users[userAddr].right != address(0)) count++;
+    function setAutoUpgrade(bool enabled) external {
+        users[msg.sender].autoUpgrade = enabled;
     }
 
-    function _recycle(address user, uint256 slot) internal {
-        users[user].recycleCount++;
-        users[user].slotExpiry[slot - 1] = block.timestamp + 14 days;
-        emit Recycled(user, slot);
-    }
+    function checkUserActivation(address user) external {
+        require(users[user].exists, "User not found");
+        require(!users[user].isFlipped, "Already flipped");
 
-    function isActive(address user) public view returns (bool) {
-        return (block.timestamp - users[user].lastActive) <= 7 days;
-    }
-
-    function distributeSlotRoyalty(uint256 slot, uint256 amountToDistribute, address[] calldata recipients) external onlyOwner nonReentrant {
-        require(slot >= 1 && slot <= 12, "Invalid slot");
-        require(amountToDistribute <= slotRoyaltyBalance[slot], "Insufficient royalty");
-
-        uint256 perUser = amountToDistribute / recipients.length;
-
-        for (uint256 i = 0; i < recipients.length; i++) {
-            if (isActive(recipients[i])) {
-                usdcToken.transfer(recipients[i], perUser);
+        if (block.timestamp > users[user].registeredAt + 7 days) {
+            if (users[user].directs.length < 2) {
+                users[user].isFlipped = true;
+                users[user].referrer = address(0);
+                emit Deactivated(user);
             }
         }
-
-        slotRoyaltyBalance[slot] -= amountToDistribute;
     }
 
-    function transferMethod(uint256 amount, address to) external onlyOwner nonReentrant {
-        usdcToken.transfer(to, amount);
+    // ---------- Public Getters for Frontend ----------
+
+    function getReferrer(address user) external view returns (address) {
+        return users[user].referrer;
+    }
+
+    function getDirects(address user) external view returns (address[] memory) {
+        return users[user].directs;
+    }
+
+    function getActiveSlots(address user) external view returns (uint256) {
+        return users[user].activeSlots;
+    }
+
+    function getSlotStatus(address user, uint256 slot) external view returns (bool) {
+        return userSlots[user][slot];
+    }
+
+    function getTotalEarnings(address user) external view returns (uint256) {
+        return totalEarnings[user];
+    }
+
+    function getRegistrationTime(address user) external view returns (uint256) {
+        return users[user].registeredAt;
+    }
+
+    function isUserFlipped(address user) external view returns (bool) {
+        return users[user].isFlipped;
+    }
+
+    function isAutoUpgradeEnabled(address user) external view returns (bool) {
+        return users[user].autoUpgrade;
+    }
+
+    function getSavedForUpgrade(address user) external view returns (uint256) {
+        return users[user].savedForUpgrade;
+    }
+
+    function getRoyaltyForSlot(uint256 slot) external view returns (uint256) {
+        return royaltyPerSlot[slot];
+    }
+
+    // Team Tree for UI (up to 3 levels)
+    function getTeamTree(address user) external view returns (
+        address left,
+        address right,
+        address leftLeft,
+        address leftRight,
+        address rightLeft,
+        address rightRight
+    ) {
+        left = users[user].left;
+        right = users[user].right;
+
+        if (left != address(0)) {
+            leftLeft = users[left].left;
+            leftRight = users[left].right;
+        }
+
+        if (right != address(0)) {
+            rightLeft = users[right].left;
+            rightRight = users[right].right;
+        }
+    }
+
+    // ---------- Admin: Distribute Royalty ----------
+
+    function distributeRoyalty(uint256 slot, address[] calldata usersList) external onlyOwner {
+        uint256 total = royaltyPerSlot[slot];
+        require(total > 0, "Nothing to distribute");
+        uint256 share = total / usersList.length;
+
+        for (uint256 i = 0; i < usersList.length; i++) {
+            usdc.transfer(usersList[i], share);
+            totalEarnings[usersList[i]] += share;
+        }
+
+        royaltyPerSlot[slot] = 0;
     }
 }
