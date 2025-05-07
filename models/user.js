@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const { defaultMaxListeners } = require("nodemailer/lib/xoauth2");
 
 const userSchema = new mongoose.Schema(
   {
