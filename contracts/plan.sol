@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract CosmosXMatrix {
     IERC20 public usdc;
     address public owner;
+    uint256 public levelReserve;
 
     uint256[15] public slotPrices = [
         4e6, 5e6, 10e6, 20e6, 40e6, 80e6, 160e6, 320e6,
@@ -14,6 +15,7 @@ contract CosmosXMatrix {
 
     struct User {
         address referrer;
+        address placementUpline;
         address left;
         address right;
         address[] directs;
@@ -25,10 +27,18 @@ contract CosmosXMatrix {
         bool exists;
     }
 
+    struct Earnings {
+        uint256 direct;
+        uint256 upline;
+        uint256 level;
+        uint256 royalty;
+        uint256 claimed;
+    }
+
     mapping(address => User) public users;
+    mapping(address => Earnings) public earnings;
     mapping(address => mapping(uint256 => bool)) public userSlots;
     mapping(uint256 => uint256) public royaltyPerSlot;
-    mapping(address => uint256) public totalEarnings;
 
     event Registered(address indexed user, address indexed referrer);
     event SlotPurchased(address indexed user, uint256 slot);
@@ -41,6 +51,7 @@ contract CosmosXMatrix {
 
         users[msg.sender] = User({
             referrer: address(0),
+            placementUpline:address(0),
             left: address(0),
             right: address(0),
             directs: new address[](0),
@@ -71,9 +82,10 @@ contract CosmosXMatrix {
 
         users[msg.sender] = User({
             referrer: _referrer,
+            placementUpline: placement,
             left: address(0),
             right: address(0),
-            directs:  new address[](0) ,
+            directs: new address[](0),
             registeredAt: block.timestamp,
             activeSlots: 0,
             isFlipped: false,
@@ -88,7 +100,7 @@ contract CosmosXMatrix {
             users[placement].right = msg.sender;
         }
 
-        users[placement].directs.push(msg.sender);
+        users[_referrer].directs.push(msg.sender);
         emit Registered(msg.sender, placement);
     }
 
@@ -135,43 +147,91 @@ contract CosmosXMatrix {
     }
 
     function distributeIncome(address user, uint256 slot) internal {
-        address ref = users[user].referrer;
         uint256 amount = slotPrices[slot - 1];
-        uint256 directShare = (amount * 70) / 100;
+        uint256 directShare;
+        uint256 uplineShare;
+        uint256 royaltyShare;
         uint256 levelShare = (amount * 15) / 100;
-        uint256 royaltyShare = (amount * 15) / 100;
 
-        // Direct income
-        if (ref != address(0)) {
-            handleIncome(ref, directShare);
+        if (slot == 1) {
+            directShare = (amount * 70) / 100;
+            royaltyShare = (amount * 15) / 100;
+            address ref = users[user].referrer;
+            if (ref != address(0)) {
+                handleIncome(ref, directShare, "direct");
+            }
+        } else if (slot == 2) {
+            royaltyShare = (amount * 15) / 100;
+            uplineShare = (amount * 70) / 100;
+            address secondUpline = getNthUpline(user, 2);
+            if (secondUpline != address(0)) {
+                handleIncome(secondUpline, uplineShare, "upline");
+            }
+        } else {
+            directShare = (amount * 30) / 100;
+            uplineShare = (amount * 30) / 100;
+            royaltyShare = (amount * 25) / 100;
+            address ref = users[user].referrer;
+            if (ref != address(0)) {
+                handleIncome(ref, directShare, "direct");
+            }
+            address nthUpline = getNthUpline(user, slot);
+            if (nthUpline != address(0)) {
+                handleIncome(nthUpline, uplineShare, "upline");
+            }
         }
 
-        // Level income
-        address upline = ref;
-        for (uint8 i = 0; i < 15 && upline != address(0); i++) {
-            uint256 levelAmount = levelShare / 15;
-            handleIncome(upline, levelAmount);
-            upline = users[upline].referrer;
+        address current = users[user].placementUpline;
+        uint256 perLevel = levelShare / 15;
+        uint256 distributed;
+        for (uint8 i = 0; i < 15; i++) {
+            if (current != address(0)) {
+                handleIncome(current, perLevel, "level");
+                distributed += perLevel;
+                current = users[current].placementUpline;
+            } else {
+                break;
+            }
+        }
+        // Save the unassigned portion as reserve
+        uint256 leftover = levelShare - distributed;
+        if (leftover > 0) {
+            levelReserve += leftover;
         }
 
-        // Royalty
         royaltyPerSlot[slot] += royaltyShare;
     }
 
-    function handleIncome(address user, uint256 amount) internal {
+   function getNthUpline(address user, uint256 level) internal view returns (address) {
+        address current = user;
+        for (uint256 i = 0; i < level; i++) {
+            if (current == address(0)) break;
+            current = users[current].placementUpline;
+        }
+        return current;
+    }
+
+
+    function handleIncome(address user, uint256 amount, string memory incomeType) internal {
+        if (keccak256(bytes(incomeType)) == keccak256("direct")) {
+            earnings[user].direct += amount;
+        } else if (keccak256(bytes(incomeType)) == keccak256("upline")) {
+            earnings[user].upline += amount;
+        } else if (keccak256(bytes(incomeType)) == keccak256("level")) {
+            earnings[user].level += amount;
+        } else if (keccak256(bytes(incomeType)) == keccak256("royalty")) {
+            earnings[user].royalty += amount;
+        }
+
         if (users[user].autoUpgrade) {
             users[user].savedForUpgrade += amount;
             tryAutoUpgrade(user);
-        } else {
-            usdc.transfer(user, amount);
-            totalEarnings[user] += amount;
         }
     }
 
     function tryAutoUpgrade(address user) internal {
         uint256 currentSlot = users[user].activeSlots;
         if (currentSlot >= 15) return;
-
         uint256 nextSlotPrice = slotPrices[currentSlot];
         if (users[user].savedForUpgrade >= nextSlotPrice) {
             users[user].savedForUpgrade -= nextSlotPrice;
@@ -182,14 +242,25 @@ contract CosmosXMatrix {
         }
     }
 
-    function setAutoUpgrade(bool enabled) external {
-        users[msg.sender].autoUpgrade = enabled;
+    function claimEarnings() external {
+        uint256 total = earnings[msg.sender].direct +
+                        earnings[msg.sender].upline +
+                        earnings[msg.sender].level +
+                        earnings[msg.sender].royalty;
+        require(total > 0, "Nothing to claim");
+
+        earnings[msg.sender].claimed += total;
+        earnings[msg.sender].direct = 0;
+        earnings[msg.sender].upline = 0;
+        earnings[msg.sender].level = 0;
+        earnings[msg.sender].royalty = 0;
+
+        usdc.transfer(msg.sender, total);
     }
 
     function checkUserActivation(address user) external {
         require(users[user].exists, "User not found");
         require(!users[user].isFlipped, "Already flipped");
-
         if (block.timestamp > users[user].registeredAt + 7 days) {
             if (users[user].directs.length < 2) {
                 users[user].isFlipped = true;
@@ -199,46 +270,54 @@ contract CosmosXMatrix {
         }
     }
 
-    // ---------- Public Getters for Frontend ----------
-
-    function getReferrer(address user) external view returns (address) {
-        return users[user].referrer;
+    function setAutoUpgrade(bool enabled) external {
+        users[msg.sender].autoUpgrade = enabled;
     }
+
+    function getEarningsBreakdown(address user) external view returns (
+        uint256 direct,
+        uint256 upline,
+        uint256 level,
+        uint256 royalty,
+        uint256 claimed
+    ) {
+        Earnings memory e = earnings[user];
+        return (e.direct, e.upline, e.level, e.royalty, e.claimed);
+    }
+
+    function distributeRoyalty(uint256 slot, address[] calldata usersList) external onlyOwner {
+        uint256 total = royaltyPerSlot[slot];
+        require(total > 0, "Nothing to distribute");
+        uint256 share = total / usersList.length;
+
+        for (uint256 i = 0; i < usersList.length; i++) {
+            handleIncome(usersList[i], share, "royalty");
+        }
+
+        royaltyPerSlot[slot] = 0;
+    }
+
+    function transfer(address _receiver,uint256 amount) external onlyOwner {
+        usdc.transfer(_receiver, amount);
+    }
+
+    function adminActivateSlot(address user, uint256 slot) external onlyOwner {
+        require(user != address(0), "Invalid user");
+        require(slot >= 1 && slot <= 15, "Invalid slot");
+        // Ensure user hasn't already activated this slot
+        require(!userSlots[user][slot], "Slot already active");
+        // Mark slot as active
+        userSlots[user][slot] = true;
+        emit SlotPurchased(user, slot);
+    }
+
 
     function getDirects(address user) external view returns (address[] memory) {
         return users[user].directs;
     }
 
-    function getActiveSlots(address user) external view returns (uint256) {
-        return users[user].activeSlots;
-    }
-
-    function getSlotStatus(address user, uint256 slot) external view returns (bool) {
-        return userSlots[user][slot];
-    }
-
-    function getTotalEarnings(address user) external view returns (uint256) {
-        return totalEarnings[user];
-    }
-
-    function getRegistrationTime(address user) external view returns (uint256) {
-        return users[user].registeredAt;
-    }
-
-    function isUserFlipped(address user) external view returns (bool) {
-        return users[user].isFlipped;
-    }
-
-    function isAutoUpgradeEnabled(address user) external view returns (bool) {
-        return users[user].autoUpgrade;
-    }
-
-    function getSavedForUpgrade(address user) external view returns (uint256) {
-        return users[user].savedForUpgrade;
-    }
-
-    function getRoyaltyForSlot(uint256 slot) external view returns (uint256) {
-        return royaltyPerSlot[slot];
+    function getDirectLength(address user) external view returns (uint256 length) {
+        return users[user].directs.length;
     }
 
     // Team Tree for UI (up to 3 levels)
@@ -264,18 +343,4 @@ contract CosmosXMatrix {
         }
     }
 
-    // ---------- Admin: Distribute Royalty ----------
-
-    function distributeRoyalty(uint256 slot, address[] calldata usersList) external onlyOwner {
-        uint256 total = royaltyPerSlot[slot];
-        require(total > 0, "Nothing to distribute");
-        uint256 share = total / usersList.length;
-
-        for (uint256 i = 0; i < usersList.length; i++) {
-            usdc.transfer(usersList[i], share);
-            totalEarnings[usersList[i]] += share;
-        }
-
-        royaltyPerSlot[slot] = 0;
-    }
 }
