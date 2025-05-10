@@ -28,7 +28,19 @@ const userSchema = new mongoose.Schema(
         type: String, 
         default: null 
     },
+    placementUpline: {
+        type: String, 
+        default: null 
+    },
     directBonus: {
+        type: Number,
+        default: 0
+    },
+    levelBonus: {
+        type: Number,
+        default: 0
+    },
+    uplineBonus: {
         type: Number,
         default: 0
     },
@@ -39,6 +51,10 @@ const userSchema = new mongoose.Schema(
     totalEarnings: {
         type: Number,
         default: 0
+    },
+    isActive: {
+        type: Boolean,
+        default: true
     },
     deviceType: { 
         type: String, 

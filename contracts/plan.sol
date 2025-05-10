@@ -20,11 +20,13 @@ contract CosmosXMatrix {
         address right;
         address[] directs;
         uint256 registeredAt;
+        uint256 activatedAt;
         uint256 activeSlots;
         bool isFlipped;
         bool autoUpgrade;
         uint256 savedForUpgrade;
         bool exists;
+        bool isActive;
     }
 
     struct Earnings {
@@ -56,11 +58,13 @@ contract CosmosXMatrix {
             right: address(0),
             directs: new address[](0),
             registeredAt: block.timestamp,
+            activatedAt: block.timestamp,
             activeSlots: 15,
             isFlipped: false,
             autoUpgrade: false,
             savedForUpgrade: 0,
-            exists: true
+            exists: true,
+            isActive: true
         });
 
         for (uint8 i = 1; i <= 15; i++) {
@@ -87,11 +91,13 @@ contract CosmosXMatrix {
             right: address(0),
             directs: new address[](0),
             registeredAt: block.timestamp,
+            activatedAt: 0,
             activeSlots: 0,
             isFlipped: false,
             autoUpgrade: false,
             savedForUpgrade: 0,
-            exists: true
+            exists: true,
+            isActive: false
         });
 
         if (users[placement].left == address(0)) {
@@ -139,6 +145,10 @@ contract CosmosXMatrix {
         for (uint256 i = 1; i <= slot; i++) {
             if (!userSlots[msg.sender][i]) {
                 userSlots[msg.sender][i] = true;
+                if(i==1){
+                    users[msg.sender].isActive = true;
+                    users[msg.sender].activatedAt = block.timestamp;
+                }
                 users[msg.sender].activeSlots++;
                 distributeIncome(msg.sender, i);
                 emit SlotPurchased(msg.sender, i);
@@ -214,7 +224,15 @@ contract CosmosXMatrix {
 
     function handleIncome(address user, uint256 amount, string memory incomeType) internal {
         if (keccak256(bytes(incomeType)) == keccak256("direct")) {
-            earnings[user].direct += amount;
+            if (users[user].autoUpgrade && users[user].activeSlots < 15) {
+            users[user].savedForUpgrade += amount;
+            uint256 leftover = tryAutoUpgrade(user);
+            if (leftover > 0) {
+                earnings[user].direct += leftover;
+            }
+            } else {
+                earnings[user].direct += amount;
+            }
         } else if (keccak256(bytes(incomeType)) == keccak256("upline")) {
             earnings[user].upline += amount;
         } else if (keccak256(bytes(incomeType)) == keccak256("level")) {
@@ -222,25 +240,28 @@ contract CosmosXMatrix {
         } else if (keccak256(bytes(incomeType)) == keccak256("royalty")) {
             earnings[user].royalty += amount;
         }
-
-        if (users[user].autoUpgrade) {
-            users[user].savedForUpgrade += amount;
-            tryAutoUpgrade(user);
-        }
     }
 
-    function tryAutoUpgrade(address user) internal {
-        uint256 currentSlot = users[user].activeSlots;
-        if (currentSlot >= 15) return;
-        uint256 nextSlotPrice = slotPrices[currentSlot];
-        if (users[user].savedForUpgrade >= nextSlotPrice) {
-            users[user].savedForUpgrade -= nextSlotPrice;
-            users[user].activeSlots++;
-            userSlots[user][currentSlot + 1] = true;
-            distributeIncome(user, currentSlot + 1);
-            emit AutoUpgrade(user, currentSlot + 1);
-        }
+    function tryAutoUpgrade(address user) internal returns (uint256 leftover) {
+            uint256 currentSlot = users[user].activeSlots;
+
+            while (currentSlot < 15) {
+                uint256 nextSlotPrice = slotPrices[currentSlot];
+                if (users[user].savedForUpgrade >= nextSlotPrice) {
+                    users[user].savedForUpgrade -= nextSlotPrice;
+                    currentSlot++;
+                    users[user].activeSlots = currentSlot;
+                    userSlots[user][currentSlot] = true;
+                    distributeIncome(user, currentSlot);
+                    emit AutoUpgrade(user, currentSlot);
+                } else {
+                    break;
+                }
+            }
+            // After upgrade loop, return leftover if any
+            return users[user].savedForUpgrade;
     }
+
 
     function claimEarnings() external {
         uint256 total = earnings[msg.sender].direct +
@@ -307,6 +328,10 @@ contract CosmosXMatrix {
         // Ensure user hasn't already activated this slot
         require(!userSlots[user][slot], "Slot already active");
         // Mark slot as active
+        if(slot == 1){
+            users[user].isActive = true;
+            users[user].activatedAt = block.timestamp;
+        }
         userSlots[user][slot] = true;
         emit SlotPurchased(user, slot);
     }
@@ -343,4 +368,15 @@ contract CosmosXMatrix {
         }
     }
 
+     // calculate slot price 
+    function getSlotPrice(uint256 _slot) external view returns (uint256 amount) {
+        // accumulate price according to acitve slot and left slot
+        uint256 totalPrice = 0;
+        for (uint256 i = 1; i <= _slot; i++) {
+            if (!userSlots[msg.sender][i]) {
+                totalPrice += slotPrices[i - 1];
+            }
+        }
+        return slotPrices[_slot-1];
+    }
 }
