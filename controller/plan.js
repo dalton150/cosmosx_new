@@ -5,8 +5,8 @@ const USDC_CONTRACT = process.env.USDC_CONTRACT;
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL_Amoy);
 const contractAddress = process.env.PlAN_CONTRACT;
-const abi = require("../common/planABI.json");
-const tokenAbi = require("../common/tokenABI.json");
+const abi = require("../common/planAbi.json");
+const tokenAbi = require("../common/tokenAbi.json");
 const USDC = new ethers.Contract(USDC_CONTRACT, tokenAbi, provider);
 const contract = new ethers.Contract(contractAddress, abi, provider);
 
