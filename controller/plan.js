@@ -96,7 +96,9 @@ const setAutoUpgrade = async (req, res) => {
 const getDirectLength = async (req, res) => {
     const { userAddress } = req.body;
     const length = await contract.getDirectLength(userAddress);
-    return res.send({data:length});
+    // handle decimals if needed
+    const lengthInNumber = Number(length);
+    return res.send({data:lengthInNumber});
 }
 
 const getDirects = async (req, res) => {
@@ -135,6 +137,53 @@ const adminActivateSlot = async (req, res) => {
     return res.send({data:tx});
 }
 
+const getUserInfo = async (req, res) => {
+    const { userAddress } = req.body;
+    const userInfo = await contract.users(userAddress);
+    let userInfoObj = {
+        referrer: userInfo[0],
+        placementUpline: userInfo[1],
+        left: userInfo[2],
+        right: userInfo[3],
+        registeredAt:Number(userInfo[4]),
+        activatedAt: Number(userInfo[5]),
+        activeSlots: Number(userInfo[6]),
+        isFlipped: userInfo[7],
+        autoUpgrade: userInfo[8],
+        savedForUpgrade: Number(userInfo[9])/1e6,
+        exists: userInfo[10],
+        isActive: userInfo[11],
+    };
+    return res.send({data:userInfoObj});
+}
+
+const getEarnings = async (req, res) => {
+    const { userAddress } = req.body;
+    const earnings = await contract.getEarningsBreakdown(userAddress);
+    let earningsObj = {
+        directBonus: Number(earnings[0])/1e6,
+        levelBonus: Number(earnings[1])/1e6,
+        uplineBonus: Number(earnings[2])/1e6,
+        royaltyBonus: Number(earnings[3])/1e6,
+        totalEarnings: Number(earnings[4])/1e6,
+    };
+    console.log("earningsObj",earningsObj);
+    return res.send({data:earningsObj});
+}
+
+const getUserSlots = async (req, res) => {
+    const { userAddress,slot } = req.body;
+    const slots = await contract.userSlots(userAddress,slot);
+    return res.send({data:slots});
+}
+
+const getRoyaltyPerSlot = async (req, res) => {
+    const { slot } = req.body;
+    const royalty = await contract.getRoyaltyPerSlot(slot);
+    return res.send({data:royalty});
+}
+
+
 
 
 
@@ -149,6 +198,11 @@ module.exports = {
     getTeamTree,
     distributeRoyalty,
     getSlotPrices,
+    adminActivateSlot,
+    getUserInfo,
+    getEarnings,
+    getUserSlots,
+    getRoyaltyPerSlot
 }
 
 
