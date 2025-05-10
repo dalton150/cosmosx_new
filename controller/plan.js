@@ -1,6 +1,7 @@
 const express = require("express");
 const { ethers } = require("ethers");
 require("dotenv").config();
+const user = require("../controller/user");
 const USDC_CONTRACT = process.env.USDC_CONTRACT;
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL_Amoy);
@@ -21,7 +22,12 @@ function buildTxDataToken(functionFragment, args) {
 }
 
 const register = async (req, res) => {
-    const { userAddress, referrer } = req.body;
+    const { userAddress, referralCode } = req.body;
+    const referredBy = await user.getReferrerInternal(referralCode);
+    if (!referredBy) {
+      return res.status(400).send({ message: "Referrer not found" });
+    }
+    const referrer = referredBy.walletAddress;
     const data = buildTxData("register", [referrer]);
     const tx = {
       to: contractAddress,

@@ -37,6 +37,15 @@ contract CosmosXMatrix {
         uint256 claimed;
     }
 
+    struct BonusRecord {
+        uint256 amount;
+        uint256 timestamp;
+        string bonusType; // "direct", "upline", "level", "royalty"
+    }
+
+    mapping(address => BonusRecord[]) public bonusHistory;
+
+
     mapping(address => User) public users;
     mapping(address => Earnings) public earnings;
     mapping(address => mapping(uint256 => bool)) public userSlots;
@@ -229,16 +238,21 @@ contract CosmosXMatrix {
             uint256 leftover = tryAutoUpgrade(user);
             if (leftover > 0) {
                 earnings[user].direct += leftover;
+                bonusHistory[user].push(BonusRecord(leftover, block.timestamp, "direct"));
             }
             } else {
                 earnings[user].direct += amount;
+                bonusHistory[user].push(BonusRecord(amount, block.timestamp, "direct"));
             }
         } else if (keccak256(bytes(incomeType)) == keccak256("upline")) {
             earnings[user].upline += amount;
+            bonusHistory[user].push(BonusRecord(amount, block.timestamp, "upline"));
         } else if (keccak256(bytes(incomeType)) == keccak256("level")) {
             earnings[user].level += amount;
+            bonusHistory[user].push(BonusRecord(amount, block.timestamp, "level"));
         } else if (keccak256(bytes(incomeType)) == keccak256("royalty")) {
             earnings[user].royalty += amount;
+            bonusHistory[user].push(BonusRecord(amount, block.timestamp, "royalty"));
         }
     }
 
@@ -379,4 +393,31 @@ contract CosmosXMatrix {
         }
         return slotPrices[_slot-1];
     }
+
+    function getTodaysBonus(address user) external view returns (
+        uint256 totalBonus,
+        BonusRecord[] memory todayRecords
+    ) {
+        uint256 count = 0;
+        uint256 todayStart = block.timestamp - (block.timestamp % 1 days);
+        BonusRecord[] memory all = bonusHistory[user];
+
+        // First pass: count today's entries
+        for (uint256 i = 0; i < all.length; i++) {
+            if (all[i].timestamp >= todayStart) {
+                count++;
+            }
+        }
+
+        // Allocate and collect today's records
+        todayRecords = new BonusRecord[](count);
+        uint256 j = 0;
+        for (uint256 i = 0; i < all.length; i++) {
+            if (all[i].timestamp >= todayStart) {
+                todayRecords[j++] = all[i];
+                totalBonus += all[i].amount;
+            }
+        }
+    }
+
 }

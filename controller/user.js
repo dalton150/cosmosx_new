@@ -153,9 +153,33 @@ const findPlacementUpline = async (startUserId = null) => {
   return null;
 };
 
+const getReferrer = async (req,res) => {
+  try {
+    const {referredBy} = req.body;
+    if (!referredBy) return res.status(400).json({ error: "Referral code required" });
+    const user = await User.findOne({referralCode: referredBy});
+    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.status(200).json({ message: "Referrer fetched", data: user.walletAddress });
+  } catch (err) {
+    console.error("Get referrer error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+}
+
+const getReferrerInternal = async (referredBy) => {
+    try {
+      const user = await User.findOne({referralCode: referredBy});
+      return user;
+    } catch (err) {
+      console.error("Get referrer error:", err);
+    }
+  }
+
 
 module.exports = {
      registerUser, 
      loginUser ,
-     findPlacementUpline
+     findPlacementUpline,
+     getReferrer,
+     getReferrerInternal,
 };

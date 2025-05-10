@@ -7,6 +7,7 @@ const userAuth = require("../services/auth");
 //========================= User Routes =========================
 router.post('/signUp', userController.registerUser);
 router.post('/login', userController.loginUser);
+router.post("/getReferrer", userController.getReferrer);
 
 
 
