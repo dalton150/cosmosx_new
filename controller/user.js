@@ -1,6 +1,7 @@
 const User = require("../models/user");
 const utility = require("../utility/utility");
 const mongoose = require("mongoose");
+const claimModel = require("../models/claim");
 
 const registerUser = async (req, res) => {
   try {
@@ -175,6 +176,55 @@ const getReferrerInternal = async (referredBy) => {
     }
   }
 
+  const createClaim = async (req, res) => {
+    try {
+      const { userAddress,hash, amount } = req.body;
+      if (!userAddress || !hash || !amount) return res.status(400).json({ error: "All fields are required" });
+      const data = {
+        walletAddress: userAddress.toLowerCase(),
+        hash,
+        amount,
+      };
+      const claim = new claimModel(data);
+      await claim.save();
+      return res.status(201).json({ message: "Claim created", claim });
+    } catch (err) {
+      console.error("Create claim error:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+
+  const getUserData = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId).lean();
+        if (!user) return res.status(404).json({ error: "User not found" });
+        return res.status(200).json({ message: "User data fetched", user });
+    } catch (err) {
+      console.error("Get user data error:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+
+  const getClaimTransaction = async (req, res) => {
+    try {
+        // get all cliams transaction of the user matching the wallet address with pagi
+        const { walletAddress, page = 1, limit = 10 } = req.query;
+        if (!walletAddress) return res.status(400).json({ error: "Wallet address required" });
+        const claims = await claimModel.find({ walletAddress: walletAddress.toLowerCase(), isDeleted: false })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .sort({ createdAt: -1 });
+        if (!claims || claims.length === 0) return res.status(404).json({ error: "No claims found" });
+        return res.status(200).json({ message: "Claims fetched", claims });
+    } catch (err) {
+      console.error("Get claim transaction error:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+
+
+
 
 module.exports = {
      registerUser, 
@@ -182,4 +232,6 @@ module.exports = {
      findPlacementUpline,
      getReferrer,
      getReferrerInternal,
+     createClaim,
+     getUserData,
 };

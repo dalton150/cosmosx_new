@@ -8,6 +8,8 @@ const userAuth = require("../services/auth");
 router.post('/signUp', userController.registerUser);
 router.post('/login', userController.loginUser);
 router.post("/getReferrer", userController.getReferrer);
+router.post("/createClaim", userController.createClaim);
+router.get("/getUserData",userAuth.userAuth, userController.getUserData);
 
 
 

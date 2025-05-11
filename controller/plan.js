@@ -128,7 +128,15 @@ const getDirects = async (req, res) => {
 const getTeamTree = async (req, res) => {
     const { userAddress } = req.body;
     const tree = await contract.getTeamTree(userAddress);
-    return res.send({data:tree});
+    const treeObj = {
+        left: tree[0],
+        right: tree[1],
+        leftLeft: tree[2],
+        leftRight: tree[3],
+        rightLeft: tree[4],
+        rightRight: tree[5]
+    };
+    return res.send({data:treeObj});
 }
 
 const distributeRoyalty = async (req, res) => {
