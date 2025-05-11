@@ -2,14 +2,16 @@ require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 
 module.exports = {
-  solidity: "0.8.20",
-  settings: {
+  solidity: {
+    version: "0.8.20",
+    settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
       viaIR: true, // Enable Intermediate Representation
     },
+  },
   networks: {
     polygon: {
       url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.API_KEY}`,
@@ -25,7 +27,7 @@ module.exports = {
   etherscan: {
     apiKey: {
       polygon: process.env.API_KEY, // Mainnet
-      polygonAmoy: process.env.API_KEY, // Amoy (if available)
+      polygonAmoy: process.env.API_KEY, // Amoy
     },
   },
 };

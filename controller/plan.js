@@ -21,7 +21,7 @@ function buildTxDataToken(functionFragment, args) {
   return iface.encodeFunctionData(functionFragment, args);
 }
 
-const register = async (req, res) => {
+const register = async (req, res) => {  // done 
     const { userAddress, referralCode } = req.body;
     const referredBy = await user.getReferrerInternal(referralCode);
     if (!referredBy) {
@@ -73,7 +73,7 @@ const getSlotPrices = async (slot) => {
     // return res.send({data:priceInNumber});
 }
 
-const upgradeSlot = async (req, res) => {
+const upgradeSlot = async (req, res) => {  // done
     const { userAddress, slot } = req.body;
     const amount = await getSlotPrices(slot);
     const data0 = await approve(userAddress, amount);
@@ -90,6 +90,18 @@ const upgradeSlot = async (req, res) => {
 const setAutoUpgrade = async (req, res) => {
     const { userAddress, enabled } = req.body;
     const data = buildTxData("setAutoUpgrade", [enabled]);
+    const tx = {
+      to: contractAddress,
+      data,
+      from: userAddress,
+      value: 0,
+    };
+    return res.send({data:tx});
+}
+
+const claimEarnings = async (req, res) => {
+    const { userAddress } = req.body;
+    const data = buildTxData("claimEarnings", []);
     const tx = {
       to: contractAddress,
       data,
@@ -120,8 +132,11 @@ const getTeamTree = async (req, res) => {
 }
 
 const distributeRoyalty = async (req, res) => {
-    const { userAddress, usersList,slot } = req.body;
-    const data = buildTxData("distributeRoyalty", [slot, usersList]);
+    let { userAddress,level,amount } = req.body;
+    console.log("distributeRoyalty",userAddress,level,amount);
+    amount = Number(amount)*1e6;
+    console.log("amount",amount);
+    const data = buildTxData("distributeRoyaltyLevelWise", [level,amount]);
     const tx = {
       to: contractAddress,
       data,
@@ -132,12 +147,12 @@ const distributeRoyalty = async (req, res) => {
 }
 
 const adminActivateSlot = async (req, res) => {
-    const { userAddress, slot } = req.body;
-    const data = buildTxData("adminActivateSlot", [slot]);
+    const {yourWallet, userAddress, slot } = req.body;
+    const data = buildTxData("adminActivateSlot", [userAddress,slot]);
     const tx = {
       to: contractAddress,
       data,
-      from: userAddress,
+      from: yourWallet,
       value: 0,
     };
     return res.send({data:tx});
@@ -159,6 +174,7 @@ const getUserInfo = async (req, res) => {
         savedForUpgrade: Number(userInfo[9])/1e6,
         exists: userInfo[10],
         isActive: userInfo[11],
+        lastIncomeAt: Number(userInfo[12]),
     };
     return res.send({data:userInfoObj});
 }
@@ -171,7 +187,7 @@ const getEarnings = async (req, res) => {
         levelBonus: Number(earnings[1])/1e6,
         uplineBonus: Number(earnings[2])/1e6,
         royaltyBonus: Number(earnings[3])/1e6,
-        totalEarnings: Number(earnings[4])/1e6,
+        totalClaimed: Number(earnings[4])/1e6,
     };
     console.log("earningsObj",earningsObj);
     return res.send({data:earningsObj});
@@ -185,10 +201,32 @@ const getUserSlots = async (req, res) => {
 
 const getRoyaltyPerSlot = async (req, res) => {
     const { slot } = req.body;
-    const royalty = await contract.getRoyaltyPerSlot(slot);
-    return res.send({data:royalty});
+    const royalty = await contract.royaltyPerSlot(slot);
+    const decimals = await USDC.decimals();
+    const royaltyInUnits = Number(royalty)/Math.pow(10,decimals);
+    return res.send({data:royaltyInUnits});
 }
 
+const evaluateActivation = async (req,res) => {
+  try {
+    const {userAddress} = req.body;
+    const result  = await contract.evaluateActivation(userAddress);
+    console.log("result",result);
+    return res.send({data:result});
+  } catch (error) {
+    console.error("Error in evaluateActivation:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
+}
+
+
+const getTodaysBonus = async (req, res) => {
+    const { userAddress } = req.body;
+    const bonus = await contract.getTodaysBonus(userAddress);
+    console.log("bonus",bonus);
+    
+    return res.send({data:bonus});
+}
 
 
 
@@ -199,6 +237,7 @@ module.exports = {
     approveSlot,
     upgradeSlot,
     setAutoUpgrade,
+    claimEarnings,
     getDirectLength,
     getDirects,
     getTeamTree,
@@ -208,7 +247,9 @@ module.exports = {
     getUserInfo,
     getEarnings,
     getUserSlots,
-    getRoyaltyPerSlot
+    getRoyaltyPerSlot,
+    evaluateActivation,
+    getTodaysBonus,
 }
 
 

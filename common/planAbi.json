@@ -5,6 +5,11 @@
 				"internalType": "address",
 				"name": "_usdc",
 				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_rootUser",
+				"type": "address"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -102,13 +107,34 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "user",
+				"name": "",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "checkUserActivation",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "bonusHistory",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "bonusType",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -122,16 +148,16 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "slot",
+				"name": "level",
 				"type": "uint256"
 			},
 			{
-				"internalType": "address[]",
-				"name": "usersList",
-				"type": "address[]"
+				"internalType": "uint256",
+				"name": "totalAmount",
+				"type": "uint256"
 			}
 		],
-		"name": "distributeRoyalty",
+		"name": "distributeRoyaltyLevelWise",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -173,6 +199,19 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "evaluateActivation",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -335,6 +374,47 @@
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getTodaysBonus",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "totalBonus",
+				"type": "uint256"
+			},
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "bonusType",
+						"type": "string"
+					}
+				],
+				"internalType": "struct CosmosXMatrix.BonusRecord[]",
+				"name": "todayRecords",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "levelReserve",
 		"outputs": [
@@ -384,6 +464,19 @@
 		"name": "register",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "rootUser",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -561,6 +654,11 @@
 				"internalType": "bool",
 				"name": "isActive",
 				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "lastIncomeAt",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",

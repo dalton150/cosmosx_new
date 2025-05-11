@@ -8,7 +8,7 @@ async function main() {
     const cosmosx = await ethers.getContractFactory("CosmosXMatrix");
     console.log("Hello world!");
     
-    const COSMOSX = await cosmosx.deploy(tokenAddress);
+    const COSMOSX = await cosmosx.deploy(tokenAddress,rootAddress);
     console.log("COSMOSX address:", COSMOSX.address);
     console.log("Root address:", rootAddress);
     await COSMOSX.waitForDeployment();
