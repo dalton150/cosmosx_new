@@ -10,7 +10,7 @@ const abi = require("../common/planAbi.json");
 const tokenAbi = require("../common/tokenAbi.json");
 const USDC = new ethers.Contract(USDC_CONTRACT, tokenAbi, provider);
 const contract = new ethers.Contract(contractAddress, abi, provider);
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
 // console.log("wallet", wallet);
 
 const plan = new ethers.Contract(contractAddress, abi, wallet);
