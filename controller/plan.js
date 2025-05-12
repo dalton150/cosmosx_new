@@ -32,7 +32,10 @@ function buildTxDataToken(functionFragment, args) {
 
 const register = async (req, res) => {  // done 
     const { userAddress, referralCode } = req.body;
+    console.log("register",userAddress,referralCode);
     const referredBy = await user.getReferrerInternal(referralCode);
+    console.log("referredBy",referredBy);
+    
     if (!referredBy) {
       return res.status(400).send({ message: "Referrer not found" });
     }

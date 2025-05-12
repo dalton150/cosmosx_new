@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const userController = require("../controller/user");
+const testController = require("../controller/test");
 const moment = require("moment-timezone");
 
 console.log("cron job started");
@@ -14,7 +14,7 @@ const logWithTime = (msg) => {
 cron.schedule("*/5 * * * *", async () => {
     logWithTime("⏱ Running 5-min cron job...");
     try {
-       await userController.triggerEvaluateActivation();
+       await testController.triggerEvaluateActivation();
       logWithTime("✅ 5-min job completed");
     } catch (error) {
       logWithTime("❌ Error in 5-min job: " + error.message);
@@ -27,7 +27,7 @@ cron.schedule("*/5 * * * *", async () => {
 cron.schedule("0 12 * * *", async () => {
     logWithTime("⏱ Running daily 12PM cron job...");
     try {
-       await userController.triggerEvaluateActivation();
+       await testController.triggerEvaluateActivation();
        logWithTime("12PM job completed");
     } catch (error) {
       logWithTime("Error in 12PM job: " + error.message);
