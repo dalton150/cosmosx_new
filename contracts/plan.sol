@@ -210,9 +210,9 @@ contract CosmosXMatrix {
         }
 
         address current = users[user].placementUpline;
-        uint256 perLevel = levelShare / 15;
+        uint256 perLevel = levelShare / 25;
         uint256 distributed;
-        for (uint8 i = 0; i < 15; i++) {
+        for (uint8 i = 0; i < 25; i++) {
             if (current != address(0)) {
                 handleIncome(current, perLevel, "level");
                 distributed += perLevel;
@@ -304,12 +304,24 @@ contract CosmosXMatrix {
         usdc.transfer(msg.sender, total);
     }
 
+    function countActiveDirects(address user) internal view returns (uint256) {
+        uint256 count = 0;
+        User storage u = users[user];
+        for (uint256 i = 0; i < u.directs.length; i++) {
+            if (users[u.directs[i]].isActive) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     function evaluateActivation(address user) external {
         require(users[user].exists, "User does not exist");
 
         User storage u = users[user];
-
-        if (block.timestamp >= u.registeredAt + 7 days && u.directs.length < 2) {
+        
+        // Use 7 days in production
+        if (block.timestamp >= u.registeredAt + 10 minutes && countActiveDirects(user) < 2) {
             if (!u.isFlipped) {
                 // First failure — flip to bottom
                 u.isFlipped = true;
@@ -347,6 +359,7 @@ contract CosmosXMatrix {
             }
         }
     }
+
 
 
     function setAutoUpgrade(bool enabled) external {
@@ -403,7 +416,7 @@ contract CosmosXMatrix {
             }
         }
         // Check if received income in last 7 days
-        return (users[user].lastIncomeAt + 7 days >= block.timestamp);
+        return (users[user].lastIncomeAt + 10 minutes >= block.timestamp);
     }
 
     function getUsersAtLevel(uint256 targetLevel) internal view returns (address[] memory) {
@@ -508,7 +521,7 @@ contract CosmosXMatrix {
                 totalPrice += slotPrices[i - 1];
             }
         }
-        return slotPrices[_slot-1];
+        return totalPrice;
     }
 
     function getTodaysBonus(address user) external view returns (

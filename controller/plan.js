@@ -10,6 +10,9 @@ const abi = require("../common/planAbi.json");
 const tokenAbi = require("../common/tokenAbi.json");
 const USDC = new ethers.Contract(USDC_CONTRACT, tokenAbi, provider);
 const contract = new ethers.Contract(contractAddress, abi, provider);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const plan = new ethers.Contract(contractAddress, abi, wallet);
+
 
 function buildTxData(functionFragment, args) {
   const iface = new ethers.utils.Interface(abi);
@@ -215,15 +218,12 @@ const getRoyaltyPerSlot = async (req, res) => {
     return res.send({data:royaltyInUnits});
 }
 
-const evaluateActivation = async (req,res) => {
+const evaluateActivation = async (userAddress) => {
   try {
-    const {userAddress} = req.body;
-    const result  = await contract.evaluateActivation(userAddress);
-    console.log("result",result);
-    return res.send({data:result});
+    const result  = await plan.evaluateActivation(userAddress);
+    return result;
   } catch (error) {
     console.error("Error in evaluateActivation:", error);
-    return res.status(500).send({ message: "Internal server error" });
   }
 }
 
@@ -235,6 +235,45 @@ const getTodaysBonus = async (req, res) => {
     
     return res.send({data:bonus});
 }
+
+const getPackagePrices = async (req, res) => {
+    const { slot } = req.body;
+    const packagePrices = await contract.getSlotPrice(slot);
+    const price = Number(packagePrices)/1e6;
+    return res.send({data:price});
+}
+
+const getRecentBonus = async (req, res) => {
+  try {
+    const { userAddress } = req.body;
+    // Validate address
+    if (!ethers.utils.isAddress(userAddress)) {
+      return res.status(400).send({ message: "Invalid address" });
+    }
+    // Let's try fetching the latest N bonus records (e.g., last 10)
+    let recentBonuses = [];
+    let index = 0;
+    // Try fetching bonuses until it reverts or fails
+    while (true) {
+      try {
+        const bonus = await contract.bonusHistory(userAddress, index);
+        recentBonuses.push({
+          amount: ethers.utils.formatUnits(bonus.amount, 6), // Adjust decimals
+          bonusType: bonus.bonusType,
+          timestamp: Number(bonus.timestamp),
+        });
+        index++;
+      } catch (err) {
+        // Break the loop if index is out of range (no more bonuses)
+        break;
+      }
+    }
+    return res.status(200).send({ data: recentBonuses });
+  } catch (err) {
+    console.error("Error fetching bonus history:", err);
+    return res.status(500).send({ message: "Internal server error" });
+  }
+};
 
 
 
@@ -258,6 +297,8 @@ module.exports = {
     getRoyaltyPerSlot,
     evaluateActivation,
     getTodaysBonus,
+    getPackagePrices,
+    getRecentBonus,
 }
 
 

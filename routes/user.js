@@ -30,6 +30,9 @@ router.post("/distributeRoyalty",planController.distributeRoyalty);
 router.post("/adminActivateSlot",planController.adminActivateSlot);
 router.post("/evaluateActivation",planController.evaluateActivation);
 router.post("/getTodaysBonus",planController.getTodaysBonus);
+router.post("/getPackagePrices",planController.getPackagePrices);
+router.post("/getRecentBonus",planController.getRecentBonus);
+
 
 
 module.exports = router;

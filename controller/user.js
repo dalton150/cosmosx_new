@@ -2,6 +2,7 @@ const User = require("../models/user");
 const utility = require("../utility/utility");
 const mongoose = require("mongoose");
 const claimModel = require("../models/claim");
+const plan = require("../controller/plan");
 
 const registerUser = async (req, res) => {
   try {
@@ -223,6 +224,33 @@ const getReferrerInternal = async (referredBy) => {
     }
   }
 
+  const getAllUsersInternal = async () => {
+    try {
+        const users = await User.find({ isDeleted: false }, { walletAddress: 1 }).lean();
+        // console.log("All users:",  users.map(user => user.walletAddress));
+        return users.map(user => user.walletAddress);
+    } catch (error) {
+        console.error("Get all users error:", error);
+    }
+  }
+
+
+  const triggerEvaluateActivation = async () => {
+    try {
+        const users = await getAllUsersInternal();
+        for (const user of users) {
+            const res = await plan.evaluateActivation(user);
+            if (res) {
+                console.log(`Activation evaluated for user: ${user}`);
+            } else {
+                console.log(`No activation needed for user: ${user}`);
+            }
+        }
+    } catch (error) {
+        console.error("Trigger evaluate activation error:", error);
+    }
+  }
+
 
 
 
@@ -234,4 +262,6 @@ module.exports = {
      getReferrerInternal,
      createClaim,
      getUserData,
+     getAllUsersInternal,
+     triggerEvaluateActivation,
 };
