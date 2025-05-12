@@ -210,20 +210,36 @@ const getReferrerInternal = async (referredBy) => {
 
   const getClaimTransaction = async (req, res) => {
     try {
-        // get all cliams transaction of the user matching the wallet address with pagi
-        const { walletAddress, page = 1, limit = 10 } = req.query;
-        if (!walletAddress) return res.status(400).json({ error: "Wallet address required" });
-        const claims = await claimModel.find({ walletAddress: walletAddress.toLowerCase(), isDeleted: false })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .sort({ createdAt: -1 });
-        if (!claims || claims.length === 0) return res.status(404).json({ error: "No claims found" });
-        return res.status(200).json({ message: "Claims fetched", claims });
+      const { page = 1, limit = 10, walletAddress } = req.query;
+  
+      const query = {
+        isDeleted: false,
+        ...(walletAddress && { walletAddress: walletAddress.toLowerCase() }),
+      };
+  
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const total = await claimModel.countDocuments(query);
+  
+      const claims = await claimModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+  
+      return res.status(200).json({
+        success: true,
+        data: claims,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(total / limit),
+        },
+      });
     } catch (err) {
       console.error("Get claim transaction error:", err);
       return res.status(500).json({ error: "Server error" });
     }
-  }
+  };
 
   const getAllUsersInternal = async () => {
     try {
@@ -232,6 +248,16 @@ const getReferrerInternal = async (referredBy) => {
         return users.map(user => user.walletAddress);
     } catch (error) {
         console.error("Get all users error:", error);
+    }
+  }
+
+  const getAllUsersCount = async (req, res) => {
+    try {
+        const userCount = await User.countDocuments({ isDeleted: false });
+        return res.status(200).json({ message: "All users fetched", userCount });
+    } catch (error) {
+        console.error("Get all users error:", error);
+        return res.status(500).json({ error: "Server error" });
     }
   }
 
@@ -250,4 +276,6 @@ module.exports = {
      createClaim,
      getUserData,
      getAllUsersInternal,
+     getClaimTransaction,
+     getAllUsersCount,
 };

@@ -32,6 +32,9 @@ function buildTxDataToken(functionFragment, args) {
 
 const register = async (req, res) => {  // done 
     const { userAddress, referralCode } = req.body;
+    if (!ethers.utils.isAddress(userAddress)) {
+      return res.status(400).send({ message: "Invalid user address" });
+    }
     console.log("register",userAddress,referralCode);
     const referredBy = await user.getReferrerInternal(referralCode);
     console.log("referredBy",referredBy);
@@ -52,6 +55,9 @@ const register = async (req, res) => {  // done
 
 const approveSlot = async (req,res) => {
   const {userAddress,amount} = req.body;
+  if (!ethers.utils.isAddress(userAddress)) {
+    return res.status(400).send({ message: "Invalid user address" });
+  }
   const data = buildTxDataToken("approve", [contractAddress, amount]);
   const tx = {
     to: USDC_CONTRACT,
