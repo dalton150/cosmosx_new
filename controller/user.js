@@ -261,6 +261,34 @@ const getReferrerInternal = async (referredBy) => {
     }
   }
 
+  const getDirectTeam = async (req, res) => {
+    try {
+        // get direct team of user with pagination
+        const { page = 1, limit = 10 } = req.query;
+        const userId = req.user._id;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const total = await User.countDocuments({ isDeleted: false, referredBy: userId });
+        const users = await User.find({ isDeleted: false, referredBy: userId })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+        return res.status(200).json({
+            success: true,
+            data: users,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                pages: Math.ceil(total / limit),
+            },
+        }); 
+    } catch (error) {
+        console.error("Get direct team error:", error);
+        return res.status(500).json({ error: "Server error" });   
+    }
+  }
+
+
 
  
 

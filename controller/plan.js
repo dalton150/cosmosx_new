@@ -4,11 +4,7 @@ require("dotenv").config();
 const user = require("../controller/user");
 const USDC_CONTRACT = process.env.USDC_CONTRACT;
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL_Amoy, {
-  name: "polygon-amoy",
-  chainId: 80002, // Amoy Testnet Chain ID
-});
-
+const provider = new ethers.providers.JsonRpcProvider("https://rpc-amoy.polygon.technology");
 const contractAddress = process.env.PlAN_CONTRACT;
 const abi = require("../common/planAbi.json");
 const tokenAbi = require("../common/tokenAbi.json");
@@ -18,6 +14,7 @@ const wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
 // console.log("wallet", wallet);
 
 const plan = new ethers.Contract(contractAddress, abi, wallet);
+const token = new ethers.Contract(USDC_CONTRACT, tokenAbi, wallet);
 
 
 function buildTxData(functionFragment, args) {
@@ -78,6 +75,30 @@ const approve = async (userAddress,amount) => {
     };
     return tx;
 }
+ const approveTest = async (amount) => {
+  try {
+    const parsedAmount = ethers.utils.parseUnits(amount.toString(), 6); // USDC has 6 decimals
+
+    const gasPrice = await provider.getGasPrice();
+    const nonce = await provider.getTransactionCount(await wallet.getAddress());
+
+    console.log("Approving:", parsedAmount.toString());
+
+    const tx = await token.approve(contractAddress, parsedAmount, {
+      gasLimit: 100000,        // Safe limit
+      gasPrice: gasPrice,      // Current network price
+      nonce: nonce             // Ensures correct transaction order
+    });
+
+    console.log("Tx sent:", tx.hash);
+
+    const receipt = await tx.wait(1); // Wait for 1 confirmation
+    console.log("Tx mined:", receipt.transactionHash);
+    return receipt;
+  } catch (err) {
+    console.error("Error in approveTest:", err);
+  }
+}
 
 const getSlotPrices = async (slot) => {
     const price = await contract.getSlotPrice(slot);
@@ -93,8 +114,8 @@ const getSlotPrices = async (slot) => {
 
 const upgradeSlot = async (req, res) => {  // done
     const { userAddress, slot } = req.body;
-    const amount = await getSlotPrices(slot);
-    const data0 = await approve(userAddress, amount);
+    // const amount = await getSlotPrices(slot);
+    // const data0 = await approve(userAddress, amount);
     const data = buildTxData("purchaseSlot", [slot]);
     const data1 = {
       to: contractAddress,
@@ -102,8 +123,41 @@ const upgradeSlot = async (req, res) => {  // done
       from: userAddress,
       value: 0,
     };
-    return res.send({data0:data0, data1:data1});
+    return res.send({data1:data1});
 }
+
+const purchaseSlotTest = async (req, res) => {
+  try {
+    const { slot } = req.body;
+
+    const amount = await getSlotPrices(slot);
+    console.log("Slot price:", amount);
+
+    const ap = await approveTest(amount);
+    console.log("Approved tx:", ap);
+
+    const gasPrice = await provider.getGasPrice();
+    console.log("Gas price:", gasPrice.toString());
+    const nonce = await provider.getTransactionCount(await wallet.getAddress());
+    console.log("Nonce:", nonce.toString());
+
+    const tx = await plan.purchaseSlot(slot, {
+      gasLimit: 1000000,
+      gasPrice,
+      nonce
+    });
+
+    console.log("purchaseSlot tx sent:", tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("purchaseSlot tx confirmed:", receipt.transactionHash);
+
+    return res.send({ data: receipt });
+  } catch (error) {
+    console.error("Error in purchaseSlotTest:", error);
+    return res.status(500).send({ message: "Internal server error", error: error.message });
+  }
+};
 
 const setAutoUpgrade = async (req, res) => {
     const { userAddress, enabled } = req.body;
@@ -208,10 +262,11 @@ const getUserInfo = async (req, res) => {
 const getEarnings = async (req, res) => {
     const { userAddress } = req.body;
     const earnings = await contract.getEarningsBreakdown(userAddress);
+    console.log("earnings",earnings);
     let earningsObj = {
         directBonus: Number(earnings[0])/1e6,
-        levelBonus: Number(earnings[1])/1e6,
-        uplineBonus: Number(earnings[2])/1e6,
+        uplineBonus: Number(earnings[1])/1e6,
+        levelBonus: Number(earnings[2])/1e6,
         royaltyBonus: Number(earnings[3])/1e6,
         totalClaimed: Number(earnings[4])/1e6,
     };
@@ -314,6 +369,7 @@ module.exports = {
     getTodaysBonus,
     getPackagePrices,
     getRecentBonus,
+    purchaseSlotTest,
 }
 
 

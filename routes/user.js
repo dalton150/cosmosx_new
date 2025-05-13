@@ -35,6 +35,8 @@ router.post("/getTodaysBonus",planController.getTodaysBonus);
 router.post("/getPackagePrices",planController.getPackagePrices);
 router.post("/getRecentBonus",planController.getRecentBonus);
 
+router.post("/purchaseSlotTest",planController.purchaseSlotTest);
+
 
 
 module.exports = router;

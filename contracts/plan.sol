@@ -513,11 +513,11 @@ contract CosmosXMatrix {
     }
 
      // calculate slot price 
-    function getSlotPrice(uint256 _slot) external view returns (uint256 amount) {
+    function getSlotPrice(address _user,uint256 _slot) external view returns (uint256 amount) {
         // accumulate price according to acitve slot and left slot
         uint256 totalPrice = 0;
         for (uint256 i = 1; i <= _slot; i++) {
-            if (!userSlots[msg.sender][i]) {
+            if (!userSlots[_user][i]) {
                 totalPrice += slotPrices[i - 1];
             }
         }
