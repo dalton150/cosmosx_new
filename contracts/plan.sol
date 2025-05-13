@@ -550,4 +550,9 @@ contract CosmosXMatrix {
         }
     }
 
+    function transferOwner(address _newOwner)  external onlyOwner {
+        require(_newOwner != address(0),"Invalid new owner");
+        owner = _newOwner;
+    }
+
 }

@@ -100,8 +100,8 @@ const approve = async (userAddress,amount) => {
   }
 }
 
-const getSlotPrices = async (slot) => {
-    const price = await contract.getSlotPrice(slot);
+const getSlotPrices = async (userAddress,slot) => {
+    const price = await contract.getSlotPrice(userAddress,slot);
     const decimals = await USDC.decimals();
     console.log("decimals",decimals);
     
@@ -114,7 +114,7 @@ const getSlotPrices = async (slot) => {
 
 const upgradeSlot = async (req, res) => {  // done
     const { userAddress, slot } = req.body;
-    // const amount = await getSlotPrices(slot);
+    // const amount = await getSlotPrices(userAddress,slot);
     // const data0 = await approve(userAddress, amount);
     const data = buildTxData("purchaseSlot", [slot]);
     const data1 = {
@@ -128,9 +128,9 @@ const upgradeSlot = async (req, res) => {  // done
 
 const purchaseSlotTest = async (req, res) => {
   try {
-    const { slot } = req.body;
+    const {userAddress, slot } = req.body;
 
-    const amount = await getSlotPrices(slot);
+    const amount = await getSlotPrices(userAddress,slot);
     console.log("Slot price:", amount);
 
     const ap = await approveTest(amount);
@@ -307,8 +307,8 @@ const getTodaysBonus = async (req, res) => {
 }
 
 const getPackagePrices = async (req, res) => {
-    const { slot } = req.body;
-    const packagePrices = await contract.getSlotPrice(slot);
+    const {userAddress, slot } = req.body;
+    const packagePrices = await contract.getSlotPrice(userAddress,slot);
     const price = Number(packagePrices)/1e6;
     return res.send({data:price});
 }

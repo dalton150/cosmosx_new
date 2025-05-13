@@ -313,6 +313,11 @@
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "_user",
+				"type": "address"
+			},
+			{
 				"internalType": "uint256",
 				"name": "_slot",
 				"type": "uint256"
@@ -544,6 +549,19 @@
 			}
 		],
 		"name": "transfer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwner",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
