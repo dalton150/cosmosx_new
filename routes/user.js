@@ -36,6 +36,7 @@ router.post("/getPackagePrices",planController.getPackagePrices);
 router.post("/getRecentBonus",planController.getRecentBonus);
 
 router.post("/purchaseSlotTest",planController.purchaseSlotTest);
+router.post("/getTotalDeposit",planController.getTotalDeposit);
 
 
 

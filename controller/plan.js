@@ -16,6 +16,11 @@ const wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
 const plan = new ethers.Contract(contractAddress, abi, wallet);
 const token = new ethers.Contract(USDC_CONTRACT, tokenAbi, wallet);
 
+const priceArray = [
+  4e6, 5e6, 10e6, 20e6, 40e6, 80e6, 160e6, 320e6,
+  640e6, 1280e6, 2560e6, 5120e6, 10240e6, 20480e6, 40960e6
+];
+
 
 function buildTxData(functionFragment, args) {
   const iface = new ethers.utils.Interface(abi);
@@ -346,6 +351,40 @@ const getRecentBonus = async (req, res) => {
 };
 
 
+const userOf = async (userAddress) => {
+  const userInfo = await contract.users(userAddress);
+  let userInfoObj = {
+      referrer: userInfo[0],
+      placementUpline: userInfo[1],
+      left: userInfo[2],
+      right: userInfo[3],
+      registeredAt:Number(userInfo[4]),
+      activatedAt: Number(userInfo[5]),
+      activeSlots: Number(userInfo[6]),
+      isFlipped: userInfo[7],
+      autoUpgrade: userInfo[8],
+      savedForUpgrade: Number(userInfo[9])/1e6,
+      exists: userInfo[10],
+      isActive: userInfo[11],
+      lastIncomeAt: Number(userInfo[12]),
+  };
+  return userInfoObj;
+}
+
+const getTotalDeposit = async (req, res) => {
+  const { userAddress } = req.body;
+  const getUser = await userOf(userAddress);
+  const { activeSlots } = getUser;
+
+  let totalDeposit = 0;
+  for (let i = 0; i < activeSlots; i++) {
+    totalDeposit += priceArray[i];
+  }
+
+  return res.send({ data: totalDeposit/1e6 });
+};
+
+
 
 
 
@@ -370,6 +409,7 @@ module.exports = {
     getPackagePrices,
     getRecentBonus,
     purchaseSlotTest,
+    getTotalDeposit,
 }
 
 
