@@ -119,8 +119,6 @@ const getSlotPrices = async (userAddress,slot) => {
 
 const upgradeSlot = async (req, res) => {  // done
     const { userAddress, slot } = req.body;
-    // const amount = await getSlotPrices(userAddress,slot);
-    // const data0 = await approve(userAddress, amount);
     const data = buildTxData("purchaseSlot", [slot]);
     const data1 = {
       to: contractAddress,
@@ -217,11 +215,11 @@ const getTeamTree = async (req, res) => {
 }
 
 const distributeRoyalty = async (req, res) => {
-    let { userAddress,level,amount } = req.body;
+    let { userAddress,slot,amount } = req.body;
     console.log("distributeRoyalty",userAddress,level,amount);
     amount = Number(amount)*1e6;
     console.log("amount",amount);
-    const data = buildTxData("distributeRoyaltyLevelWise", [level,amount]);
+    const data = buildTxData("distributeRoyaltyLevelWise", [slot,amount]);
     const tx = {
       to: contractAddress,
       data,
@@ -272,8 +270,9 @@ const getEarnings = async (req, res) => {
         directBonus: Number(earnings[0])/1e6,
         uplineBonus: Number(earnings[1])/1e6,
         levelBonus: Number(earnings[2])/1e6,
-        royaltyBonus: Number(earnings[3])/1e6,
-        totalClaimed: Number(earnings[4])/1e6,
+        leftOver: Number(earnings[3])/1e6,
+        royaltyBonus: Number(earnings[4])/1e6,
+        totalClaimed: Number(earnings[5])/1e6,
     };
     console.log("earningsObj",earningsObj);
     return res.send({data:earningsObj});
@@ -291,15 +290,6 @@ const getRoyaltyPerSlot = async (req, res) => {
     const decimals = await USDC.decimals();
     const royaltyInUnits = Number(royalty)/Math.pow(10,decimals);
     return res.send({data:royaltyInUnits});
-}
-
-const evaluateActivation = async (userAddress) => {
-  try {
-    const result  = await plan.evaluateActivation(userAddress);
-    return result;
-  } catch (error) {
-    console.error("Error in evaluateActivation:", error);
-  }
 }
 
 
@@ -384,6 +374,39 @@ const getTotalDeposit = async (req, res) => {
   return res.send({ data: totalDeposit/1e6 });
 };
 
+const distributeRewardAdmin = async(req,res) => {
+  let {walletAddress,userAddress,amount} = req.body;
+
+  const data = buildTxData("distributeReward", [user,amount]);
+    const tx = {
+      to: contractAddress,
+      data,
+      from: userAddress,
+      value: 0,
+    };
+}
+
+const getLevelBonus = async (req,res) => {
+  const {userAddress} = req.body;
+  let levelBonus =  await contract.levelBonus(userAddress);
+  levelBonus = Number(levelBonus)*1e6;
+  return res.send({Bonus:levelBonus}); 
+}
+
+const isEligibleForIncome = async (req,res) => {
+  const {userAddress} = req.body;
+  let isEligible = await contract.isEligibleForIncome(userAddress);
+  return res.send({data:isEligible});
+}
+
+const getLostIncomeData = async (req,res) => {
+  const {userAddress} = req.body;
+  let lostData = await contract.getLostIncomeDetails(userAddress);
+
+  return res.send({data:lostData});
+}
+
+
 
 
 
@@ -404,12 +427,14 @@ module.exports = {
     getEarnings,
     getUserSlots,
     getRoyaltyPerSlot,
-    evaluateActivation,
     getTodaysBonus,
     getPackagePrices,
     getRecentBonus,
     purchaseSlotTest,
     getTotalDeposit,
+    getLevelBonus,
+    isEligibleForIncome,
+    getLostIncomeData,
 }
 
 

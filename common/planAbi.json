@@ -132,6 +132,11 @@
 				"internalType": "string",
 				"name": "bonusType",
 				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fromSlot",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -147,8 +152,26 @@
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "_user",
+				"type": "address"
+			},
+			{
 				"internalType": "uint256",
-				"name": "level",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "distributeReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "slot",
 				"type": "uint256"
 			},
 			{
@@ -189,6 +212,11 @@
 			},
 			{
 				"internalType": "uint256",
+				"name": "leftOver",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
 				"name": "royalty",
 				"type": "uint256"
 			},
@@ -199,19 +227,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "evaluateActivation",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -298,6 +313,11 @@
 			},
 			{
 				"internalType": "uint256",
+				"name": "leftOver",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
 				"name": "royalty",
 				"type": "uint256"
 			},
@@ -305,6 +325,40 @@
 				"internalType": "uint256",
 				"name": "claimed",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getLostIncomeDetails",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "totalLost",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "todayLost",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "yesterdayLost",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[15]",
+				"name": "slotWiseLost",
+				"type": "uint256[15]"
 			}
 		],
 		"stateMutability": "view",
@@ -409,11 +463,54 @@
 						"internalType": "string",
 						"name": "bonusType",
 						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "fromSlot",
+						"type": "uint256"
 					}
 				],
 				"internalType": "struct CosmosXMatrix.BonusRecord[]",
 				"name": "todayRecords",
 				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "isEligibleForIncome",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "levelBonus",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -426,6 +523,40 @@
 			{
 				"internalType": "uint256",
 				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "lostIncomes",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "fromSlot",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "time",
 				"type": "uint256"
 			}
 		],
@@ -469,6 +600,25 @@
 		"name": "register",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "rewardBonus",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -572,6 +722,30 @@
 		"outputs": [
 			{
 				"internalType": "contract IERC20",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "userAddressPerSlot",
+		"outputs": [
+			{
+				"internalType": "address",
 				"name": "",
 				"type": "address"
 			}

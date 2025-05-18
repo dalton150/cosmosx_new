@@ -30,13 +30,16 @@ router.post("/getUserSlots",planController.getUserSlots);
 router.post("/getRoyaltyPerSlot",planController.getRoyaltyPerSlot);
 router.post("/distributeRoyalty",planController.distributeRoyalty);
 router.post("/adminActivateSlot",planController.adminActivateSlot);
-router.post("/evaluateActivation",planController.evaluateActivation);
+// router.post("/evaluateActivation",planController.evaluateActivation);
 router.post("/getTodaysBonus",planController.getTodaysBonus);
 router.post("/getPackagePrices",planController.getPackagePrices);
 router.post("/getRecentBonus",planController.getRecentBonus);
 
 router.post("/purchaseSlotTest",planController.purchaseSlotTest);
 router.post("/getTotalDeposit",planController.getTotalDeposit);
+router.post("/getLevelBonus",planController.getLevelBonus);
+router.post("/isEligibleForIncome",planController.isEligibleForIncome);
+router.post("/getLostIncomeData",planController.getLostIncomeData);
 
 
 
