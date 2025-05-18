@@ -289,6 +289,61 @@ const getReferrerInternal = async (referredBy) => {
   }
 
 
+const getCommunityTeam = async (req,res) => {
+    try {
+        const { walletAddress } = req.body;
+        const rootUser = await User.findOne({ walletAddress:walletAddress.toLowerCase() });
+        console.log("rootUser==>",rootUser);
+        
+        if (!rootUser) {
+        return res.status(404).json({ message: 'User not found' });
+        }
+
+        let queue = [rootUser];
+        let levels = [];
+        
+        while (queue.length > 0) {
+            let levelSize = queue.length;
+            let currentLevel = [];
+
+            for (let i = 0; i < levelSize; i++) {
+                const user = queue.shift();
+                currentLevel.push({
+                walletAddress: user.walletAddress,
+                referralCode: user.referralCode,
+                leftChild: user.leftChild,
+                rightChild: user.rightChild,
+                });
+
+                if (user.leftChild) {
+                    const left = await User.findOne({ walletAddress: user.leftChild });
+                    if (left) queue.push(left);
+                }
+
+                if (user.rightChild) {
+                    const right = await User.findOne({ walletAddress: user.rightChild });
+                    if (right) queue.push(right);
+                }
+            }
+
+            levels.push(currentLevel);
+        }
+        res.json({ root: walletAddress, downline: levels });
+    } catch (err) {
+        console.error('Error fetching downline users:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+}
+
+const getCommunitySize = async (req,res) => {
+    try {
+        
+    } catch (error) {
+        
+    }
+}
+
+
 
  
 
@@ -306,4 +361,5 @@ module.exports = {
      getAllUsersInternal,
      getClaimTransaction,
      getAllUsersCount,
+     getCommunityTeam,
 };

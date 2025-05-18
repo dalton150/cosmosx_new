@@ -353,6 +353,9 @@ contract CosmosXMatrix {
             if (activeDirects < 2) {
                 return false;
             }
+            if(user == rootUser){
+                return true;
+            }
         }
         return true;
     }

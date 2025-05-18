@@ -12,6 +12,7 @@ router.post("/createClaim", userController.createClaim);
 router.get("/getUserData",userAuth.userAuth, userController.getUserData);
 router.post("/getClaimTransaction",userAuth.userAuth, userController.getClaimTransaction);
 router.get("/getAllUsersCount", userController.getAllUsersCount);
+router.post("/getCommunityTeam",userController.getCommunityTeam);
 
 
 
