@@ -216,7 +216,7 @@ const getTeamTree = async (req, res) => {
 
 const distributeRoyalty = async (req, res) => {
     let { userAddress,slot,amount } = req.body;
-    console.log("distributeRoyalty",userAddress,level,amount);
+    console.log("distributeRoyalty",userAddress,slot,amount);
     amount = Number(amount)*1e6;
     console.log("amount",amount);
     const data = buildTxData("distributeRoyaltyLevelWise", [slot,amount]);
@@ -402,8 +402,15 @@ const isEligibleForIncome = async (req,res) => {
 const getLostIncomeData = async (req,res) => {
   const {userAddress} = req.body;
   let lostData = await contract.getLostIncomeDetails(userAddress);
-
-  return res.send({data:lostData});
+  console.log("lostData==>",lostData);
+  const lostObj = {
+    totalLost: Number(lostData[0])*1e6,
+    todayLost: Number(lostData[1])*1e6,
+    yesterdayLost: Number(lostData[2])*1e6,
+    slotWiseLost: lostData[3]
+  }
+  console.log("lostObj==>",lostObj);
+  return res.send({data:lostObj});
 }
 
 
