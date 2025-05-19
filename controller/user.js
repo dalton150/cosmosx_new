@@ -10,6 +10,8 @@ const registerUser = async (req, res) => {
     if (!walletAddress) return res.status(400).json({ error: "Wallet address required" });
 
     const existingUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+    console.log("existingUser==>",existingUser);
+    
     if (existingUser) return res.status(409).json({ error: "User already registered" });
 
     // Generate next referral code

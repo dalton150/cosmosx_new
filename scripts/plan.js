@@ -1,24 +1,25 @@
 const { ethers } = require("hardhat");
 require("dotenv").config();
-const tokenAddress = process.env.USDC_CONTRACT; // Replace with your token address
-const rootAddress = process.env.ROOT_ADDRESS; // Replace with your root address
+
+const tokenAddress = process.env.USDC_CONTRACT;   // USDC address on Polygon
+const rootAddress = process.env.ROOT_ADDRESS;     // Root user wallet
 
 async function main() {
-    console.log("Deploying FortonClone...");
-    const cosmosx = await ethers.getContractFactory("CosmosXMatrix");
-    console.log("Hello world!");
-    
-    const COSMOSX = await cosmosx.deploy(tokenAddress,rootAddress);
-    console.log("COSMOSX address:", COSMOSX.address);
-    console.log("Root address:", rootAddress);
-    await COSMOSX.waitForDeployment();
-    console.log("plan deployed to:",await COSMOSX.getAddress());
-    // npx hardhat run scripts/plan.js --network amoy  // command to run the script
-}
+    console.log("🚀 Deploying CosmosXMatrix...");
 
-main()
-    .then(() => process.exit(0))
-    .catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
+    const CosmosXMatrix = await ethers.getContractFactory("CosmosXMatrix");
+    const contract = await CosmosXMatrix.deploy(tokenAddress, rootAddress);
+
+    console.log("📡 Waiting for deployment confirmation...");
+    await contract.waitForDeployment();
+
+    const deployedAddress = await contract.getAddress();
+
+    console.log(`✅ CosmosXMatrix deployed at: ${deployedAddress}`);
+    console.log(`🌱 Root address set to: ${rootAddress}`);
+}
+  
+main().then(() => process.exit(0)).catch((error) => {
+    console.error("❌ Deployment failed:", error);
+    process.exit(1);
+});

@@ -14,9 +14,10 @@ module.exports = {
   },
   networks: {
     polygon: {
-      url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.API_KEY}`,
+     url: "https://polygon-rpc.com/",
       accounts: [`0x${process.env.PRIVATE_KEY}`],
       chainId: 137,
+      gasPrice: 80000000000,
     },
     amoy: {
       url: `https://polygon-amoy.g.alchemy.com/v2/${process.env.API_KEY}`,

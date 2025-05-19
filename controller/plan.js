@@ -4,7 +4,7 @@ require("dotenv").config();
 const user = require("../controller/user");
 const USDC_CONTRACT = process.env.USDC_CONTRACT;
 
-const provider = new ethers.providers.JsonRpcProvider("https://rpc-amoy.polygon.technology");
+const provider = new ethers.providers.JsonRpcProvider("https://polygon-rpc.com/");
 const contractAddress = process.env.PlAN_CONTRACT;
 const abi = require("../common/planAbi.json");
 const tokenAbi = require("../common/tokenAbi.json");
