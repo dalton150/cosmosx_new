@@ -41,7 +41,7 @@ router.post("/getTotalDeposit",planController.getTotalDeposit);
 router.post("/getLevelBonus",planController.getLevelBonus);
 router.post("/isEligibleForIncome",planController.isEligibleForIncome);
 router.post("/getLostIncomeData",planController.getLostIncomeData);
-
+router.post("/getRewardBonus",planController.getRewardBonus);
 
 
 module.exports = router;

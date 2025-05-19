@@ -8,6 +8,7 @@ const provider = new ethers.providers.JsonRpcProvider("https://rpc-amoy.polygon.
 const contractAddress = process.env.PlAN_CONTRACT;
 const abi = require("../common/planAbi.json");
 const tokenAbi = require("../common/tokenAbi.json");
+const userModel = require("../models/user");
 const USDC = new ethers.Contract(USDC_CONTRACT, tokenAbi, provider);
 const contract = new ethers.Contract(contractAddress, abi, provider);
 const wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
@@ -33,6 +34,7 @@ function buildTxDataToken(functionFragment, args) {
 }
 
 const register = async (req, res) => {  // done 
+  try {
     const { userAddress, referralCode } = req.body;
     if (!ethers.utils.isAddress(userAddress)) {
       return res.status(400).send({ message: "Invalid user address" });
@@ -53,21 +55,30 @@ const register = async (req, res) => {  // done
       value: 0,
     };
     return res.send({data:tx});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const approveSlot = async (req,res) => {
-  const {userAddress,amount} = req.body;
-  if (!ethers.utils.isAddress(userAddress)) {
-    return res.status(400).send({ message: "Invalid user address" });
+  try {
+    const {userAddress,amount} = req.body;
+    if (!ethers.utils.isAddress(userAddress)) {
+      return res.status(400).send({ message: "Invalid user address" });
+    }
+    const data = buildTxDataToken("approve", [contractAddress, amount]);
+    const tx = {
+      to: USDC_CONTRACT,
+      data,
+      from: userAddress,
+      value: 0,
+    };
+    return res.send({data:tx});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
   }
-  const data = buildTxDataToken("approve", [contractAddress, amount]);
-  const tx = {
-    to: USDC_CONTRACT,
-    data,
-    from: userAddress,
-    value: 0,
-  };
-  return res.send({data:tx});
 }
 
 const approve = async (userAddress,amount) => {
@@ -106,6 +117,7 @@ const approve = async (userAddress,amount) => {
 }
 
 const getSlotPrices = async (userAddress,slot) => {
+  try {
     const price = await contract.getSlotPrice(userAddress,slot);
     const decimals = await USDC.decimals();
     console.log("decimals",decimals);
@@ -114,10 +126,14 @@ const getSlotPrices = async (userAddress,slot) => {
     const priceInNumber = parseFloat(priceInUnits);
     console.log("priceInNumber",priceInNumber);
     return priceInNumber;
+  } catch (error) {
+    
+  }
     // return res.send({data:priceInNumber});
 }
 
 const upgradeSlot = async (req, res) => {  // done
+  try {
     const { userAddress, slot } = req.body;
     const data = buildTxData("purchaseSlot", [slot]);
     const data1 = {
@@ -127,6 +143,10 @@ const upgradeSlot = async (req, res) => {  // done
       value: 0,
     };
     return res.send({data1:data1});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const purchaseSlotTest = async (req, res) => {
@@ -163,6 +183,7 @@ const purchaseSlotTest = async (req, res) => {
 };
 
 const setAutoUpgrade = async (req, res) => {
+  try {
     const { userAddress, enabled } = req.body;
     const data = buildTxData("setAutoUpgrade", [enabled]);
     const tx = {
@@ -172,9 +193,14 @@ const setAutoUpgrade = async (req, res) => {
       value: 0,
     };
     return res.send({data:tx});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const claimEarnings = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const data = buildTxData("claimEarnings", []);
     const tx = {
@@ -184,23 +210,38 @@ const claimEarnings = async (req, res) => {
       value: 0,
     };
     return res.send({data:tx});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getDirectLength = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const length = await contract.getDirectLength(userAddress);
     // handle decimals if needed
     const lengthInNumber = Number(length);
     return res.send({data:lengthInNumber});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getDirects = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const directs = await contract.getDirects(userAddress);
     return res.send({data:directs});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getTeamTree = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const tree = await contract.getTeamTree(userAddress);
     const treeObj = {
@@ -212,9 +253,14 @@ const getTeamTree = async (req, res) => {
         rightRight: tree[5]
     };
     return res.send({data:treeObj});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const distributeRoyalty = async (req, res) => {
+  try {
     let { userAddress,slot,amount } = req.body;
     console.log("distributeRoyalty",userAddress,slot,amount);
     amount = Number(amount)*1e6;
@@ -227,9 +273,14 @@ const distributeRoyalty = async (req, res) => {
       value: 0,
     };
     return res.send({data:tx});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const adminActivateSlot = async (req, res) => {
+  try {
     const {yourWallet, userAddress, slot } = req.body;
     const data = buildTxData("adminActivateSlot", [userAddress,slot]);
     const tx = {
@@ -239,9 +290,14 @@ const adminActivateSlot = async (req, res) => {
       value: 0,
     };
     return res.send({data:tx});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getUserInfo = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const userInfo = await contract.users(userAddress);
     let userInfoObj = {
@@ -260,9 +316,14 @@ const getUserInfo = async (req, res) => {
         lastIncomeAt: Number(userInfo[12]),
     };
     return res.send({data:userInfoObj});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getEarnings = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const earnings = await contract.getEarningsBreakdown(userAddress);
     console.log("earnings",earnings);
@@ -276,36 +337,60 @@ const getEarnings = async (req, res) => {
     };
     console.log("earningsObj",earningsObj);
     return res.send({data:earningsObj});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getUserSlots = async (req, res) => {
+  try {
     const { userAddress,slot } = req.body;
     const slots = await contract.userSlots(userAddress,slot);
     return res.send({data:slots});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getRoyaltyPerSlot = async (req, res) => {
+  try {
     const { slot } = req.body;
     const royalty = await contract.royaltyPerSlot(slot);
     const decimals = await USDC.decimals();
     const royaltyInUnits = Number(royalty)/Math.pow(10,decimals);
     return res.send({data:royaltyInUnits});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 
 const getTodaysBonus = async (req, res) => {
+  try {
     const { userAddress } = req.body;
     const bonus = await contract.getTodaysBonus(userAddress);
     console.log("bonus",bonus);
     
     return res.send({data:bonus});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getPackagePrices = async (req, res) => {
+  try {
     const {userAddress, slot } = req.body;
     const packagePrices = await contract.getSlotPrice(userAddress,slot);
     const price = Number(packagePrices)/1e6;
     return res.send({data:price});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getRecentBonus = async (req, res) => {
@@ -334,8 +419,8 @@ const getRecentBonus = async (req, res) => {
       }
     }
     return res.status(200).send({ data: recentBonuses });
-  } catch (err) {
-    console.error("Error fetching bonus history:", err);
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
     return res.status(500).send({ message: "Internal server error" });
   }
 };
@@ -362,55 +447,87 @@ const userOf = async (userAddress) => {
 }
 
 const getTotalDeposit = async (req, res) => {
-  const { userAddress } = req.body;
-  const getUser = await userOf(userAddress);
-  const { activeSlots } = getUser;
-
-  let totalDeposit = 0;
-  for (let i = 0; i < activeSlots; i++) {
-    totalDeposit += priceArray[i];
+  try {
+    const { userAddress } = req.body;
+    const getUser = await userOf(userAddress);
+    const { activeSlots } = getUser;
+  
+    let totalDeposit = 0;
+    for (let i = 0; i < activeSlots; i++) {
+      totalDeposit += priceArray[i];
+    }
+    return res.send({ data: totalDeposit/1e6 });
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
   }
-
-  return res.send({ data: totalDeposit/1e6 });
 };
 
-const distributeRewardAdmin = async(req,res) => {
-  let {walletAddress,userAddress,amount} = req.body;
+const isEligibleForReward = async (user) => {
+  try {
+      const isEligible =  await contract.isEligibleForIncome(user);
+      return isEligible;
+  } catch (error) {
+    console.log(error);
+  }
+}
 
-  const data = buildTxData("distributeReward", [user,amount]);
-    const tx = {
-      to: contractAddress,
-      data,
-      from: userAddress,
-      value: 0,
-    };
+const distributeRewardAdmin = async(req,res) => {
+  let {amount} = req.body;
 }
 
 const getLevelBonus = async (req,res) => {
-  const {userAddress} = req.body;
-  let levelBonus =  await contract.levelBonus(userAddress);
-  levelBonus = Number(levelBonus)*1e6;
-  return res.send({Bonus:levelBonus}); 
+  try {
+    const {userAddress} = req.body;
+    let levelBonus =  await contract.levelBonus(userAddress);
+    levelBonus = Number(levelBonus)*1e6;
+    return res.send({Bonus:levelBonus}); 
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const isEligibleForIncome = async (req,res) => {
-  const {userAddress} = req.body;
-  let isEligible = await contract.isEligibleForIncome(userAddress);
-  return res.send({data:isEligible});
+  try {
+    const {userAddress} = req.body;
+    let isEligible = await contract.isEligibleForIncome(userAddress);
+    return res.send({data:isEligible});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 const getLostIncomeData = async (req,res) => {
-  const {userAddress} = req.body;
-  let lostData = await contract.getLostIncomeDetails(userAddress);
-  console.log("lostData==>",lostData);
-  const lostObj = {
-    totalLost: Number(lostData[0])*1e6,
-    todayLost: Number(lostData[1])*1e6,
-    yesterdayLost: Number(lostData[2])*1e6,
-    slotWiseLost: lostData[3]
+  try {
+    const {userAddress} = req.body;
+    let lostData = await contract.getLostIncomeDetails(userAddress);
+    console.log("lostData==>",lostData);
+    const lostObj = {
+      totalLost: Number(lostData[0])*1e6,
+      todayLost: Number(lostData[1])*1e6,
+      yesterdayLost: Number(lostData[2])*1e6,
+      slotWiseLost: lostData[3]
+    }
+    console.log("lostObj==>",lostObj);
+    return res.send({data:lostObj});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
   }
-  console.log("lostObj==>",lostObj);
-  return res.send({data:lostObj});
+}
+
+const getRewardBonus = async (req,res) => {
+  try {
+    const {userAddress} = req.body;
+    let reward = await contract.rewardBonus(userAddress);
+    reward = Number(reward)/1e6;
+    return res.send({data:reward});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
 }
 
 
@@ -442,6 +559,7 @@ module.exports = {
     getLevelBonus,
     isEligibleForIncome,
     getLostIncomeData,
+    getRewardBonus,
 }
 
 

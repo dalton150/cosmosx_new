@@ -142,7 +142,7 @@ contract CosmosXMatrix {
     }
 
     function findFreePlacement(address start) public view returns (address) {
-        address[50000] memory queue;
+        address[10000] memory queue;
         uint256 head = 0;
         uint256 tail = 0;
         queue[tail++] = start;
@@ -254,46 +254,52 @@ contract CosmosXMatrix {
     }
 
 
-    function handleIncome(address user, uint256 amount, string memory incomeType,uint256 slot) internal {
-        if(isEligibleForIncome(user)){
-            if (keccak256(bytes(incomeType)) == keccak256("direct")) {
-                if(users[user].isActive){
-                    earnings[user].direct += amount;
-                    bonusHistory[user].push(BonusRecord(amount, block.timestamp, "direct",slot));
-                    users[user].lastIncomeAt =  block.timestamp;
-                    usdc.transfer(user, amount);
-                }
-            } else if (keccak256(bytes(incomeType)) == keccak256("upline")) {
-                if(isSlotActive(user,slot)){
-                    if (users[user].autoUpgrade && users[user].activeSlots < 15) {
-                        users[user].savedForUpgrade += amount;
-                        uint256 leftover = tryAutoUpgrade(user);
-                        if (leftover > 0) {
-                            earnings[user].leftOver += leftover;
-                            bonusHistory[user].push(BonusRecord(leftover, block.timestamp, "leftOver",slot));
-                        }
-                    }else {
-                        earnings[user].upline += amount;
-                        bonusHistory[user].push(BonusRecord(amount, block.timestamp, "upline",slot));
-                        users[user].lastIncomeAt =  block.timestamp;
-                        usdc.transfer(user, amount);
+    function handleIncome(address user, uint256 amount, string memory incomeType, uint256 slot) internal {
+        address current = user;
+        while (true) {
+            if (isEligibleForIncome(current)) {
+                if (keccak256(bytes(incomeType)) == keccak256("direct")) {
+                    if (users[current].isActive) {
+                        earnings[current].direct += amount;
+                        bonusHistory[current].push(BonusRecord(amount, block.timestamp, "direct", slot));
+                        users[current].lastIncomeAt = block.timestamp;
+                        usdc.transfer(current, amount);
                     }
-                }else {
-                    lostIncomes[user].push(LostIncome({fromSlot:slot,amount:amount,time:block.timestamp}));
-                    address nextUpline = getNthUpline(user,1);
-                    handleIncome(nextUpline,amount,"upline",slot);
+                } else if (keccak256(bytes(incomeType)) == keccak256("upline")) {
+                    if (isSlotActive(current, slot)) {
+                        if (users[current].autoUpgrade && users[current].activeSlots < 15) {
+                            users[current].savedForUpgrade += amount;
+                            uint256 leftover = tryAutoUpgrade(current);
+                            if (leftover > 0) {
+                                earnings[current].leftOver += leftover;
+                                bonusHistory[current].push(BonusRecord(leftover, block.timestamp, "leftOver", slot));
+                            }
+                        } else {
+                            earnings[current].upline += amount;
+                            bonusHistory[current].push(BonusRecord(amount, block.timestamp, "upline", slot));
+                            users[current].lastIncomeAt = block.timestamp;
+                            usdc.transfer(current, amount);
+                        }
+                    } else {
+                        lostIncomes[current].push(LostIncome({fromSlot: slot, amount: amount, time: block.timestamp}));
+                        current = getNthUpline(current, 1); // move to next upline and retry
+                        continue;
+                    }
+                } else if (keccak256(bytes(incomeType)) == keccak256("level")) {
+                    earnings[current].level += amount;
+                    levelBonus[current] += amount;
+                    bonusHistory[current].push(BonusRecord(amount, block.timestamp, "level", slot));
+                } else if (keccak256(bytes(incomeType)) == keccak256("royalty")) {
+                    earnings[current].royalty += amount;
+                    usdc.transfer(current, amount);
+                    bonusHistory[current].push(BonusRecord(amount, block.timestamp, "royalty", slot));
                 }
-            } else if (keccak256(bytes(incomeType)) == keccak256("level")) {
-                earnings[user].level += amount;
-                levelBonus[user] += amount;
-                bonusHistory[user].push(BonusRecord(amount, block.timestamp, "level",slot));
-            } else if (keccak256(bytes(incomeType)) == keccak256("royalty")) {
-                earnings[user].royalty += amount;
-                usdc.transfer(user, amount);
-                bonusHistory[user].push(BonusRecord(amount, block.timestamp, "royalty",slot));
+                break; // income distributed successfully, exit loop
+            } else {
+                 lostIncomes[current].push(LostIncome({fromSlot: slot, amount: amount, time: block.timestamp}));
+                 usdc.transfer(rootUser,amount);
+                 bonusHistory[rootUser].push(BonusRecord(amount, block.timestamp, "from_UnActive_user",slot));
             }
-        }else{
-            handleIncome(rootUser,amount,incomeType,slot);
         }
     }
 
@@ -338,10 +344,30 @@ contract CosmosXMatrix {
         return count;
     }
 
+    function isEligibleForReward(address user) public view returns (bool) {
+        User storage u = users[user];
+        // Check if user has purchased level 10
+        if (!isSlotActive(user, 10)) {
+            return false;
+        }
+        uint256 count = 0;
+        // Loop through directs and check if at least 2 have purchased level 9
+        for (uint256 i = 0; i < u.directs.length; i++) {
+            if (isSlotActive(u.directs[i], 9)) {
+                count++;
+            }
+            if (count >= 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     function isEligibleForIncome(address user) public view returns (bool) {
         // if (!users[user].isActive) return false;
         uint256 registrationTime = users[user].registeredAt;
-        if (block.timestamp > registrationTime + 10 minutes) { //7 days for prod
+        if (block.timestamp > registrationTime + 1 hours) { //7 days for prod
             // Check how many direct referrals are active
             uint256 activeDirects = 0;
             address[] storage directs = users[user].directs;
@@ -422,7 +448,7 @@ contract CosmosXMatrix {
             }
         }
         // Check if received income in last 7 days
-        return (users[user].lastIncomeAt + 10 minutes >= block.timestamp);
+        return (users[user].lastIncomeAt + 30 minutes >= block.timestamp);
     }
 
     function transfer(address _receiver,uint256 amount) external onlyOwner {
@@ -544,12 +570,13 @@ contract CosmosXMatrix {
             }
         }
     }
+
     function distributeReward(address _user,uint256 amount) external  onlyOwner {
-        require(isSlotActive(_user,1),"user is not active");
-        require(countActiveDirects(_user)>= 2,"Insufficient direct referrals");
+        require(isEligibleForReward(_user),"user's reward condition failed");
         rewardBonus[_user] += amount;
         usdc.transfer(_user,amount);
     }
+
     function transferOwner(address _newOwner)  external onlyOwner {
         require(_newOwner != address(0),"Invalid new owner");
         owner = _newOwner;
