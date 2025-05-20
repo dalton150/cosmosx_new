@@ -480,7 +480,7 @@ const getLevelBonus = async (req,res) => {
   try {
     const {userAddress} = req.body;
     let levelBonus =  await contract.levelBonus(userAddress);
-    levelBonus = Number(levelBonus)*1e6;
+    levelBonus = Number(levelBonus)/1e6;
     return res.send({Bonus:levelBonus}); 
   } catch (error) {
     console.error("Error fetching bonus history:", error);
