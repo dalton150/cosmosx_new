@@ -9,6 +9,7 @@ const contractAddress = process.env.PlAN_CONTRACT;
 const abi = require("../common/planAbi.json");
 const tokenAbi = require("../common/tokenAbi.json");
 const userModel = require("../models/user");
+const message = require("../messages/message");
 const USDC = new ethers.Contract(USDC_CONTRACT, tokenAbi, provider);
 const contract = new ethers.Contract(contractAddress, abi, provider);
 const wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
@@ -465,16 +466,72 @@ const getTotalDeposit = async (req, res) => {
 
 const isEligibleForReward = async (user) => {
   try {
-      const isEligible =  await contract.isEligibleForIncome(user);
-      return isEligible;
+    const isEligible = await contract.isEligibleForReward(user);
+    return isEligible;
   } catch (error) {
-    console.log(error);
+    console.log(`Eligibility check failed for ${user}:`, error);
+    return false;
   }
-}
+};
 
-const distributeRewardAdmin = async(req,res) => {
-  let {amount} = req.body;
-}
+// Distribute reward to eligible users using owner's wallet
+const distributeRewardAdmin = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount) {
+      return res.status(400).json({ message: "Reward amount is required" });
+    }
+
+    const allUsers = await userModel.find({});
+    const eligibleUsers = [];
+
+    // Collect eligible users first (to avoid double RPC calls)
+    for (let user of allUsers) {
+      const address = user.walletAddress;
+      const eligible = await isEligibleForReward(address);
+      if (eligible) eligibleUsers.push(address);
+    }
+
+    const eligibleCount = eligibleUsers.length;
+    if (eligibleCount === 0) {
+      return res.status(200).json({ message: "No eligible users found" });
+    }
+
+    const distributed = [];
+    const failed = [];
+    const amountPerUser = ethers.utils.parseUnits((amount / eligibleCount).toFixed(6), 6); // USDC - 6 decimals
+    console.log("amountPerUser==>",amountPerUser);
+    let nonce = await provider.getTransactionCount(wallet.address);
+    for (let walletAddr of eligibleUsers) {
+      try {
+        const gasPrice = await provider.getGasPrice();
+        const tx = await plan.distributeReward(walletAddr, amountPerUser, {
+          gasLimit: 100000,
+          gasPrice,
+          nonce
+        });
+        await tx.wait();
+        console.log(`Reward distributed to ${walletAddr}`);
+        distributed.push(walletAddr);
+        nonce++; // manually increment nonce
+      } catch (err) {
+        console.error(`Failed to distribute to ${walletAddr}:`, err);
+        failed.push(walletAddr);
+      }
+    }
+    return res.status(200).json({
+      message: "Reward distribution completed",
+      distributedCount: distributed.length,
+      failedCount: failed.length,
+      distributed,
+      failed
+    });
+
+  } catch (error) {
+    console.error("Reward distribution error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 const getLevelBonus = async (req,res) => {
   try {
@@ -530,6 +587,78 @@ const getRewardBonus = async (req,res) => {
   }
 }
 
+const withdrawAdmin = async (req,res) => {
+  try {
+    let {walletAddress,amount} = req.body;
+    amount = amount*1e6;
+    console.log("amount==>",amount);
+    const gasPrice = await provider.getGasPrice();
+    console.log("Gas price:", gasPrice.toString());
+    const nonce = await provider.getTransactionCount(await wallet.getAddress());
+    console.log("Nonce:", nonce.toString());
+    const tx = await plan.transfer(walletAddress,amount,{
+      gasLimit: 100000,
+      gasPrice,
+      nonce
+    });
+    console.log("tx==>",tx);
+    console.log("transfer tx sent:", tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("transfer tx confirmed:", receipt.transactionHash);
+    
+    return res.send({data:tx});
+  } catch (error) {
+    return res.status(500).send({message:"transfer failed"});
+  }
+}
+
+const checkUserSlots = async (address, slot) => {
+  try {
+    const isEligible = await contract.userSlots(address, slot);
+    return isEligible;
+  } catch (error) {
+    console.log(`Slot check failed for ${address}:`, error);
+    return false;
+  }
+};
+
+const getAllEligibleUsersForLottery = async (req, res) => {
+  try {
+    const { slot = 4, count = 10 } = req.body;
+    const slotNumber = parseInt(slot);
+    const resultCount = parseInt(count);
+
+    const allUsers = await userModel.find({});
+    const eligibleWallets = [];
+
+    for (const user of allUsers) {
+      const eligible = await checkUserSlots(user.walletAddress, slotNumber);
+      if (eligible) {
+        eligibleWallets.push(user.walletAddress);
+      }
+    }
+
+    if (eligibleWallets.length === 0) {
+      return res.status(200).json({ message: "No eligible users found for this slot", data: [] });
+    }
+
+    // Shuffle and pick random 'count' users
+    const shuffled = eligibleWallets.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, resultCount);
+
+    return res.status(200).json({
+      success: true,
+      totalEligible: eligibleWallets.length,
+      selectedCount: selected.length,
+      selected,
+    });
+  } catch (error) {
+    console.error("Lottery selection error:", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
 
 
 
@@ -560,6 +689,9 @@ module.exports = {
     isEligibleForIncome,
     getLostIncomeData,
     getRewardBonus,
+    withdrawAdmin,
+    getAllEligibleUsersForLottery,
+    distributeRewardAdmin,
 }
 
 

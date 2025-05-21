@@ -13,6 +13,8 @@ router.get("/getUserData",userAuth.userAuth, userController.getUserData);
 router.post("/getClaimTransaction",userAuth.userAuth, userController.getClaimTransaction);
 router.get("/getAllUsersCount", userController.getAllUsersCount);
 router.post("/getCommunityTeam",userController.getCommunityTeam);
+router.post("/getCommunitySize",userController.getCommunitySize);
+router.post("/getDirectTeam",userController.getDirectTeam);
 
 
 
@@ -42,6 +44,8 @@ router.post("/getLevelBonus",planController.getLevelBonus);
 router.post("/isEligibleForIncome",planController.isEligibleForIncome);
 router.post("/getLostIncomeData",planController.getLostIncomeData);
 router.post("/getRewardBonus",planController.getRewardBonus);
-
+router.post("/withdrawAdmin",planController.withdrawAdmin);
+router.post("/getAllEligibleUsersForLottery",planController.getAllEligibleUsersForLottery);
+router.post("/distributeRewardAdmin",planController.distributeRewardAdmin);
 
 module.exports = router;

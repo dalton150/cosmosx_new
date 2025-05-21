@@ -124,7 +124,7 @@ contract CosmosXMatrix {
             activatedAt: 0,
             activeSlots: 0,
             isFlipped: false,
-            autoUpgrade: false,
+            autoUpgrade: true,
             savedForUpgrade: 0,
             exists: true,
             isActive: false,
@@ -162,14 +162,12 @@ contract CosmosXMatrix {
     function purchaseSlot(uint256 slot) external {
         require(slot >= 1 && slot <= 15, "Invalid slot");
         require(users[msg.sender].exists, "User not registered");
-
         uint256 totalCost = 0;
         for (uint256 i = 1; i <= slot; i++) {
             if (!userSlots[msg.sender][i]) {
                 totalCost += slotPrices[i - 1];
             }
         }
-
         require(totalCost > 0, "All slots already purchased");
         usdc.transferFrom(msg.sender, address(this), totalCost);
 
@@ -254,17 +252,27 @@ contract CosmosXMatrix {
     }
 
 
-    function handleIncome(address user, uint256 amount, string memory incomeType, uint256 slot) internal {
+    function handleIncome(
+        address user,
+        uint256 amount,
+        string memory incomeType,
+        uint256 slot
+    ) internal {
         address current = user;
-        while (true) {
+        uint256 maxHops = 10; // prevent infinite loop
+        uint256 hop = 0;
+
+        while (hop < maxHops && current != address(0)) {
             if (isEligibleForIncome(current)) {
                 if (keccak256(bytes(incomeType)) == keccak256("direct")) {
                     if (users[current].isActive) {
                         earnings[current].direct += amount;
                         bonusHistory[current].push(BonusRecord(amount, block.timestamp, "direct", slot));
                         users[current].lastIncomeAt = block.timestamp;
-                        usdc.transfer(current, amount);
+                        require(usdc.transfer(current, amount), "Direct transfer failed");
                     }
+                    break;
+
                 } else if (keccak256(bytes(incomeType)) == keccak256("upline")) {
                     if (isSlotActive(current, slot)) {
                         if (users[current].autoUpgrade && users[current].activeSlots < 15) {
@@ -278,30 +286,41 @@ contract CosmosXMatrix {
                             earnings[current].upline += amount;
                             bonusHistory[current].push(BonusRecord(amount, block.timestamp, "upline", slot));
                             users[current].lastIncomeAt = block.timestamp;
-                            usdc.transfer(current, amount);
+                            require(usdc.transfer(current, amount), "Upline transfer failed");
                         }
+                        break;
                     } else {
                         lostIncomes[current].push(LostIncome({fromSlot: slot, amount: amount, time: block.timestamp}));
-                        current = getNthUpline(current, 1); // move to next upline and retry
+                        current = getNthUpline(current, 1); // move to next upline
+                        hop++;
                         continue;
                     }
+
                 } else if (keccak256(bytes(incomeType)) == keccak256("level")) {
                     earnings[current].level += amount;
                     levelBonus[current] += amount;
                     bonusHistory[current].push(BonusRecord(amount, block.timestamp, "level", slot));
+                    break;
+
                 } else if (keccak256(bytes(incomeType)) == keccak256("royalty")) {
                     earnings[current].royalty += amount;
-                    usdc.transfer(current, amount);
+                    require(usdc.transfer(current, amount), "Royalty transfer failed");
                     bonusHistory[current].push(BonusRecord(amount, block.timestamp, "royalty", slot));
+                    break;
                 }
-                break; // income distributed successfully, exit loop
+
             } else {
-                 lostIncomes[current].push(LostIncome({fromSlot: slot, amount: amount, time: block.timestamp}));
-                 usdc.transfer(rootUser,amount);
-                 bonusHistory[rootUser].push(BonusRecord(amount, block.timestamp, "from_UnActive_user",slot));
+                lostIncomes[current].push(LostIncome({fromSlot: slot, amount: amount, time: block.timestamp}));
+                current = getNthUpline(current, 1); // fallback to next
+                hop++;
             }
         }
+        if (hop >= maxHops || current == address(0)) {
+            require(usdc.transfer(rootUser, amount), "Fallback transfer failed");
+            bonusHistory[rootUser].push(BonusRecord(amount, block.timestamp, "from_UnActive_user", slot));
+        }
     }
+
 
     function tryAutoUpgrade(address user) internal returns (uint256 leftover) {
             uint256 currentSlot = users[user].activeSlots;
@@ -418,22 +437,12 @@ contract CosmosXMatrix {
                 eligibleCount++;
             }
         }
-
         require(eligibleCount > 0, "No eligible users for royalty");
-
         uint256 sharePerUser = totalAmount / eligibleCount;
-
         for (uint256 i = 0; i < usersAtSlot.length; i++) {
             address user = usersAtSlot[i];
             if (isEligibleForRoyalty(user)) {
-                // Transfer USDC to eligible user
-                require(
-                    usdc.transfer(user, sharePerUser),
-                    "USDC transfer failed"
-                );
-
-                // Update user's royalty earnings if needed
-                earnings[user].royalty += sharePerUser;
+                handleIncome(user, sharePerUser,"royalty",slot);
             }
         }
     }
@@ -448,7 +457,7 @@ contract CosmosXMatrix {
             }
         }
         // Check if received income in last 7 days
-        return (users[user].lastIncomeAt + 30 minutes >= block.timestamp);
+        return (users[user].lastIncomeAt +  1 hours >= block.timestamp);
     }
 
     function transfer(address _receiver,uint256 amount) external onlyOwner {
@@ -572,9 +581,10 @@ contract CosmosXMatrix {
     }
 
     function distributeReward(address _user,uint256 amount) external  onlyOwner {
-        require(isEligibleForReward(_user),"user's reward condition failed");
+        require(isEligibleForReward(_user),"user is not eligible");
         rewardBonus[_user] += amount;
         usdc.transfer(_user,amount);
+        bonusHistory[_user].push(BonusRecord(amount, block.timestamp, "reward",10));
     }
 
     function transferOwner(address _newOwner)  external onlyOwner {

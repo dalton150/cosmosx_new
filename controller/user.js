@@ -265,18 +265,41 @@ const getReferrerInternal = async (referredBy) => {
 
   const getDirectTeam = async (req, res) => {
     try {
-        // get direct team of user with pagination
-        const { page = 1, limit = 10 } = req.query;
-        const userId = req.user._id;
+        const {walletAddress} = req.body;
+        const { page = 1, limit = 10} = req.query;
+        if (!walletAddress) {
+            return res.status(400).json({ error: "walletAddress is required" });
+        }
+
+        const u = await User.findOne({ walletAddress: walletAddress.toLowerCase()});
+        if(!u) {
+            return res.status(400).json({ error: "user not found" });
+        }
         const skip = (parseInt(page) - 1) * parseInt(limit);
-        const total = await User.countDocuments({ isDeleted: false, referredBy: userId });
-        const users = await User.find({ isDeleted: false, referredBy: userId })
+
+        // Get total direct referrals using walletAddress
+        const total = await User.countDocuments({ isDeleted: false, referredBy: u.referralCode });
+
+        // Get direct users
+        const users = await User.find({ isDeleted: false, referredBy: u.referralCode })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
+
+        // Map users with their directCount
+        const userData = await Promise.all(users.map(async (user) => {
+            const directCount = await User.countDocuments({ isDeleted: false, referredBy: user.referralCode });
+            return {
+                walletAddress: user.walletAddress,
+                referralCode: user.referralCode,
+                referredBy: user.referredBy,
+                directCount
+            };
+        }));
+
         return res.status(200).json({
             success: true,
-            data: users,
+            data: userData,
             pagination: {
                 total,
                 page: parseInt(page),
@@ -288,62 +311,108 @@ const getReferrerInternal = async (referredBy) => {
         console.error("Get direct team error:", error);
         return res.status(500).json({ error: "Server error" });   
     }
-  }
+};
 
 
-const getCommunityTeam = async (req,res) => {
+  const getCommunityTeam = async (req, res) => {
     try {
         const { walletAddress } = req.body;
-        const rootUser = await User.findOne({ walletAddress:walletAddress.toLowerCase() });
-        console.log("rootUser==>",rootUser);
-        
+        const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+
         if (!rootUser) {
-        return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ message: 'User not found' });
         }
 
         let queue = [rootUser];
         let levels = [];
-        
+
         while (queue.length > 0) {
             let levelSize = queue.length;
             let currentLevel = [];
+            let nextQueue = [];
 
             for (let i = 0; i < levelSize; i++) {
-                const user = queue.shift();
-                currentLevel.push({
-                walletAddress: user.walletAddress,
-                referralCode: user.referralCode,
-                leftChild: user.leftChild,
-                rightChild: user.rightChild,
-                });
+                const user = queue[i];
 
-                if (user.leftChild) {
-                    const left = await User.findOne({ walletAddress: user.leftChild });
-                    if (left) queue.push(left);
-                }
+                if (user) {
+                    currentLevel.push({
+                        walletAddress: user.walletAddress,
+                        referralCode: user.referralCode,
+                        referredBy: user.referredBy,
+                    });
 
-                if (user.rightChild) {
-                    const right = await User.findOne({ walletAddress: user.rightChild });
-                    if (right) queue.push(right);
+                    // Fetch children, add nulls if they don't exist
+                    const left = user.leftChild
+                        ? await User.findOne({ walletAddress: user.leftChild })
+                        : null;
+                    const right = user.rightChild
+                        ? await User.findOne({ walletAddress: user.rightChild })
+                        : null;
+
+                    nextQueue.push(left);
+                    nextQueue.push(right);
+                } else {
+                    // This is a null node, push two nulls to maintain structure
+                    currentLevel.push(null);
+                    nextQueue.push(null, null);
                 }
             }
 
+            // Check if nextQueue has all nulls -> stop
+            const hasRealNodes = nextQueue.some(u => u !== null);
             levels.push(currentLevel);
+
+            if (!hasRealNodes) break;
+            queue = nextQueue;
         }
+
         res.json({ root: walletAddress, downline: levels });
     } catch (err) {
         console.error('Error fetching downline users:', err);
         res.status(500).json({ message: 'Server error' });
     }
-}
+};
 
-const getCommunitySize = async (req,res) => {
+const getCommunitySize = async (req, res) => {
     try {
-        
+        const { walletAddress } = req.body;
+        const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+
+        if (!rootUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        let count = 0;
+        let queue = [rootUser];
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+
+            // Fetch left child if exists
+            if (current.leftChild) {
+                const left = await User.findOne({ walletAddress: current.leftChild });
+                if (left) {
+                    queue.push(left);
+                    count++;
+                }
+            }
+
+            // Fetch right child if exists
+            if (current.rightChild) {
+                const right = await User.findOne({ walletAddress: current.rightChild });
+                if (right) {
+                    queue.push(right);
+                    count++;
+                }
+            }
+        }
+
+        res.json({ walletAddress, downlineCount: count });
     } catch (error) {
-        
+        console.error("Error in getCommunitySize:", error);
+        res.status(500).json({ message: "Server error" });
     }
-}
+};
 
 
 
@@ -364,4 +433,6 @@ module.exports = {
      getClaimTransaction,
      getAllUsersCount,
      getCommunityTeam,
+     getCommunitySize,
+     getDirectTeam,
 };

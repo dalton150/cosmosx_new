@@ -17,6 +17,7 @@ async function main() {
 
     console.log(`✅ CosmosXMatrix deployed at: ${deployedAddress}`);
     console.log(`🌱 Root address set to: ${rootAddress}`);
+    //npm install ethers@^5.8.0
 }
   
 main().then(() => process.exit(0)).catch((error) => {
