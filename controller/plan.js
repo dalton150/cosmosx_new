@@ -562,9 +562,9 @@ const getLostIncomeData = async (req,res) => {
     let lostData = await contract.getLostIncomeDetails(userAddress);
     console.log("lostData==>",lostData);
     const lostObj = {
-      totalLost: Number(lostData[0])*1e6,
-      todayLost: Number(lostData[1])*1e6,
-      yesterdayLost: Number(lostData[2])*1e6,
+      totalLost: Number(lostData[0])/1e6,
+      todayLost: Number(lostData[1])/1e6,
+      yesterdayLost: Number(lostData[2])/1e6,
       slotWiseLost: lostData[3]
     }
     console.log("lostObj==>",lostObj);
