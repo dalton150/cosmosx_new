@@ -47,5 +47,7 @@ router.post("/getRewardBonus",planController.getRewardBonus);
 router.post("/withdrawAdmin",planController.withdrawAdmin);
 router.post("/getAllEligibleUsersForLottery",planController.getAllEligibleUsersForLottery);
 router.post("/distributeRewardAdmin",planController.distributeRewardAdmin);
+router.post("/checkIsEligibleForRoyalty",planController.checkIsEligibleForRoyalty);
+router.post("/checkIsEligibleForReward",planController.checkIsEligibleForReward);
 
 module.exports = router;

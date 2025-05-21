@@ -520,24 +520,30 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
 			}
 		],
-		"name": "levelBonus",
+		"name": "isEligibleForRoyalty",
 		"outputs": [
 			{
-				"internalType": "uint256",
+				"internalType": "bool",
 				"name": "",
-				"type": "uint256"
+				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "levelReserve",
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "levelBonus",
 		"outputs": [
 			{
 				"internalType": "uint256",

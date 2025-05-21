@@ -659,6 +659,26 @@ const getAllEligibleUsersForLottery = async (req, res) => {
   }
 };
 
+const checkIsEligibleForRoyalty = async (req,res) => {
+  try {
+    const {userAddress} = req.body;
+    let isEligible = await contract.isEligibleForRoyalty(userAddress);
+    return res.send({data:isEligible});
+  } catch (error) {
+    return res.status(500).json({ error: "Server error" });
+  }
+}
+
+const checkIsEligibleForReward = async (req,res) => {
+  try {
+    const {userAddress} = req.body;
+    let isEligible = await contract.isEligibleForReward(userAddress);
+    return res.send({data:isEligible});
+  } catch (error) {
+    return res.status(500).json({ error: "Server error" });
+  }
+}
+
 
 
 
@@ -692,6 +712,8 @@ module.exports = {
     withdrawAdmin,
     getAllEligibleUsersForLottery,
     distributeRewardAdmin,
+    checkIsEligibleForRoyalty,
+    checkIsEligibleForReward,
 }
 
 
