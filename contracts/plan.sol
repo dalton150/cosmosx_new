@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract CosmosXMatrix {
+contract EAGLITE {
     IERC20 public usdc;
     address public owner;
     uint256 private  levelReserve;
@@ -254,7 +254,7 @@ contract CosmosXMatrix {
     function handleDirectIncome(address user , uint256 amount ,uint256 slot) internal {
         if(isEligibleForIncome(user)){
             if (users[user].isActive) {
-                if (users[user].autoUpgrade && users[user].activeSlots < 15) {
+                if (users[user].autoUpgrade && users[user].activeSlots <= 15 && slot >= users[user].activeSlots) {
                     users[user].savedForUpgrade += amount;
                     (bool upgraded, uint256 leftover) = tryAutoUpgrade(user);
                     if (upgraded && leftover > 0) {
@@ -276,7 +276,7 @@ contract CosmosXMatrix {
     function handleUplineIncome(address user,uint256 amount,uint256 slot ) internal {
         if(isEligibleForIncome(user)){
             if (isSlotActive(user, slot)) {
-                if (users[user].autoUpgrade && users[user].activeSlots < 15) {
+                if (users[user].autoUpgrade && users[user].activeSlots < 15 && slot >= users[user].activeSlots) {
                     users[user].savedForUpgrade += amount;
                     (bool upgraded, uint256 leftover) = tryAutoUpgrade(user);
                     if (upgraded && leftover > 0) {
@@ -291,8 +291,9 @@ contract CosmosXMatrix {
                 }
             } else {
                 lostIncomes[user].push(LostIncome({fromSlot: slot, amount: amount, time: block.timestamp}));
-                require(usdc.transfer(rootUser, amount), "Fallback transfer failed");
-                bonusHistory[rootUser].push(BonusRecord(amount, block.timestamp, "From unMatched_slot", slot));
+                // find next upline
+                address nextUpline = getNthUpline(user, 1);
+                handleUplineIncome(nextUpline, amount, slot);
             }
         }else{
             _handleFallbackIncome(amount, slot);
@@ -384,7 +385,7 @@ contract CosmosXMatrix {
             return true;
         }
         uint256 registrationTime = users[user].registeredAt;
-        if (block.timestamp > registrationTime + 1 hours) { //7 days for prod
+        if (block.timestamp > registrationTime + 7 days) { //7 days for prod
             // Check how many direct referrals are active
             uint256 activeDirects = 0;
             address[] storage directs = users[user].directs;

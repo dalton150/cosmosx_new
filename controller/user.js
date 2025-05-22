@@ -16,7 +16,8 @@ const registerUser = async (req, res) => {
 
     // Generate next referral code
     const lastUser = await User.findOne().sort({ createdAt: -1 });
-    const nextReferralCode = lastUser ? (parseInt(lastUser.referralCode) + 1).toString() : "1";
+    const lastReferralNumber = lastUser?.referralCode?.replace(/^EAGL/, '') || "0";
+    const nextReferralCode = `EAGL${parseInt(lastReferralNumber) + 1}`;
 
     let placementUpline = null;
     if (referredBy) {

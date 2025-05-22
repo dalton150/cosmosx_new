@@ -650,6 +650,7 @@ const getAllEligibleUsersForLottery = async (req, res) => {
     return res.status(200).json({
       success: true,
       totalEligible: eligibleWallets.length,
+      eligibleWallets:eligibleWallets,
       selectedCount: selected.length,
       selected,
     });

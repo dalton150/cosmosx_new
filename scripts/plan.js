@@ -7,7 +7,7 @@ const rootAddress = process.env.ROOT_ADDRESS;     // Root user wallet
 async function main() {
     console.log("🚀 Deploying CosmosXMatrix...");
 
-    const CosmosXMatrix = await ethers.getContractFactory("CosmosXMatrix");
+    const CosmosXMatrix = await ethers.getContractFactory("EAGLITE");
     const contract = await CosmosXMatrix.deploy(tokenAddress, rootAddress);
 
     console.log("📡 Waiting for deployment confirmation...");
