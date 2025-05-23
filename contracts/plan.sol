@@ -385,7 +385,7 @@ contract EAGLITE {
             return true;
         }
         uint256 registrationTime = users[user].registeredAt;
-        if (block.timestamp > registrationTime + 7 days) { //7 days for prod
+        if (block.timestamp > registrationTime + 9 days) { //9 days for prod
             // Check how many direct referrals are active
             uint256 activeDirects = 0;
             address[] storage directs = users[user].directs;
