@@ -49,5 +49,6 @@ router.post("/getAllEligibleUsersForLottery",planController.getAllEligibleUsersF
 router.post("/distributeRewardAdmin",planController.distributeRewardAdmin);
 router.post("/checkIsEligibleForRoyalty",planController.checkIsEligibleForRoyalty);
 router.post("/checkIsEligibleForReward",planController.checkIsEligibleForReward);
+router.post("/adminActivateSlotInteranl",planController.adminActivateSlotInteranl);
 
 module.exports = router;

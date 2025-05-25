@@ -297,6 +297,33 @@ const adminActivateSlot = async (req, res) => {
   }
 }
 
+const adminActivateSlotInteranl = async (req, res) => {
+  try {
+    const {userAddress, slot } = req.body;
+    const gasPrice = await provider.getGasPrice();
+    console.log("Gas price:", gasPrice.toString());
+    console.log("await wallet.getAddress()==>",await wallet.getAddress());
+    
+    const nonce = await provider.getTransactionCount(await wallet.getAddress());
+    console.log("Nonce:", nonce.toString());
+    const tx = await plan.adminActivateSlot(userAddress,slot,{
+      gasLimit: 1000000,
+      gasPrice,
+      nonce
+    });
+    console.log("tx==>",tx);
+    console.log("transfer tx sent:", tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("transfer tx confirmed:", receipt.transactionHash);
+    
+    return res.send({data: tx.hash});
+  } catch (error) {
+    console.error("Error fetching bonus history:", error);
+    return res.status(500).send({ message: "Internal server error" });
+  }
+}
+
 const getUserInfo = async (req, res) => {
   try {
     const { userAddress } = req.body;
@@ -715,6 +742,7 @@ module.exports = {
     distributeRewardAdmin,
     checkIsEligibleForRoyalty,
     checkIsEligibleForReward,
+    adminActivateSlotInteranl,
 }
 
 
