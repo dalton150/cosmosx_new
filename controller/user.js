@@ -213,11 +213,15 @@ const getReferrerInternal = async (referredBy) => {
 
   const getClaimTransaction = async (req, res) => {
     try {
-      const { page = 1, limit = 10, walletAddress } = req.query;
+      const { page = 1, limit = 10 } = req.query;
+      const { walletAddress } = req.body;
+  
+      if (!walletAddress) {
+        return res.status(400).json({ error: "walletAddress is required" });
+      }
   
       const query = {
-        isDeleted: false,
-        ...(walletAddress && { walletAddress: walletAddress.toLowerCase() }),
+        walletAddress: walletAddress.toLowerCase(),
       };
   
       const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -243,6 +247,7 @@ const getReferrerInternal = async (referredBy) => {
       return res.status(500).json({ error: "Server error" });
     }
   };
+  
 
   const getAllUsersInternal = async () => {
     try {

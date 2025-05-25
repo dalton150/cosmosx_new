@@ -10,7 +10,7 @@ router.post('/login', userController.loginUser);
 router.post("/getReferrer", userController.getReferrer);
 router.post("/createClaim", userController.createClaim);
 router.get("/getUserData",userAuth.userAuth, userController.getUserData);
-router.post("/getClaimTransaction",userAuth.userAuth, userController.getClaimTransaction);
+router.post("/getClaimTransaction",userController.getClaimTransaction);
 router.get("/getAllUsersCount", userController.getAllUsersCount);
 router.post("/getCommunityTeam",userController.getCommunityTeam);
 router.post("/getCommunitySize",userController.getCommunitySize);
