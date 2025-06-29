@@ -3,6 +3,7 @@ const { ethers } = require("ethers");
 require("dotenv").config();
 const user = require("../controller/user");
 const USDC_CONTRACT = process.env.USDC_CONTRACT;
+const LotteryDraw = require("../models/LotteryDraw");
 
 const provider = new ethers.providers.JsonRpcProvider("https://polygon-rpc.com/");
 const contractAddress = process.env.PlAN_CONTRACT;
@@ -656,9 +657,14 @@ const getAllEligibleUsersForLottery = async (req, res) => {
     const slotNumber = parseInt(slot);
     const resultCount = parseInt(count);
 
-    const allUsers = await userModel.find({});
-    const eligibleWallets = [];
+    // Fetch or initialize the last draw time for this slot
+    let draw = await LotteryDraw.findOne({ slot: slotNumber });
+    let lastDrawAt = draw ? draw.lastDrawAt : new Date(0); // if no draw before, use epoch
 
+    // Get users created after last draw
+    const allUsers = await userModel.find({ createdAt: { $gt: lastDrawAt } });
+
+    const eligibleWallets = [];
     for (const user of allUsers) {
       const eligible = await checkUserSlots(user.walletAddress, slotNumber);
       if (eligible) {
@@ -667,17 +673,25 @@ const getAllEligibleUsersForLottery = async (req, res) => {
     }
 
     if (eligibleWallets.length === 0) {
-      return res.status(200).json({ message: "No eligible users found for this slot", data: [] });
+      return res.status(200).json({ message: "No eligible users found after last draw", data: [] });
     }
 
-    // Shuffle and pick random 'count' users
+    // Shuffle and select
     const shuffled = eligibleWallets.sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, resultCount);
+
+    // Update lastDrawAt
+    if (draw) {
+      draw.lastDrawAt = new Date();
+      await draw.save();
+    } else {
+      await LotteryDraw.create({ slot: slotNumber, lastDrawAt: new Date() });
+    }
 
     return res.status(200).json({
       success: true,
       totalEligible: eligibleWallets.length,
-      eligibleWallets:eligibleWallets,
+      eligibleWallets,
       selectedCount: selected.length,
       selected,
     });
