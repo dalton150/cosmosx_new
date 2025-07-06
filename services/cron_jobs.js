@@ -9,14 +9,14 @@ const logWithTime = (msg) => {
     console.log(`[${timeIST} IST] ${msg}`);
 };
 
-cron.schedule("*/40 * * * *", async () => {
-    logWithTime("⏱ Running 20-min cron job...");
-    try {
-       await  synceBonusData.synceBonusData();
-      logWithTime("✅ 20-min job completed");
-    } catch (error) {
-      logWithTime("❌ Error in 20-min job: " + error.message);
-    }
-  }, {
-    timezone: "Asia/Kolkata"
+cron.schedule("*/50 * * * *", async () => {
+  logWithTime("⏱ Running 50-min cron job...");
+  try {
+    await synceBonusData.synceBonusData();
+    logWithTime("✅ 50-min job completed");
+  } catch (error) {
+    logWithTime("❌ Error in 50-min job: " + error.message);
+  }
+}, {
+  timezone: "Asia/Kolkata"
 });
