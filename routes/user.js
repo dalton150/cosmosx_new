@@ -15,6 +15,7 @@ router.get("/getAllUsersCount", userController.getAllUsersCount);
 router.post("/getCommunityTeam",userController.getCommunityTeam);
 router.post("/getCommunitySize",userController.getCommunitySize);
 router.post("/getDirectTeam",userController.getDirectTeam);
+router.post("/getRecentBonus", userController.getRecentBonus);
 
 
 
@@ -36,7 +37,7 @@ router.post("/adminActivateSlot",planController.adminActivateSlot);
 // router.post("/evaluateActivation",planController.evaluateActivation);
 router.post("/getTodaysBonus",planController.getTodaysBonus);
 router.post("/getPackagePrices",planController.getPackagePrices);
-router.post("/getRecentBonus",planController.getRecentBonus);
+// router.post("/getRecentBonus",planController.getRecentBonus);
 
 router.post("/purchaseSlotTest",planController.purchaseSlotTest);
 router.post("/getTotalDeposit",planController.getTotalDeposit);

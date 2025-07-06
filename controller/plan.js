@@ -4,6 +4,8 @@ require("dotenv").config();
 const user = require("../controller/user");
 const USDC_CONTRACT = process.env.USDC_CONTRACT;
 const LotteryDraw = require("../models/LotteryDraw");
+const mongoose = require("mongoose");
+const Bonus = require("../models/bonus");
 
 const provider = new ethers.providers.JsonRpcProvider("https://polygon-rpc.com/");
 const contractAddress = process.env.PlAN_CONTRACT;
@@ -455,6 +457,60 @@ const getRecentBonus = async (req, res) => {
 };
 
 
+// const getRecentBonus = async (req, res) => {
+//   try {
+//     const { userAddress } = req.body;
+//     if (!ethers.utils.isAddress(userAddress)) {
+//       return res.status(400).send({ message: "Invalid address" });
+//     }
+//     const MAX_BONUSES = 10;
+
+//     // Step 1: Binary search to find the last valid index
+//     let low = 0;
+//     let high = 10000; // upper bound guess
+//     let lastValidIndex = -1;
+
+//     while (low <= high) {
+//       const mid = Math.floor((low + high) / 2);
+//       try {
+//         await contract.bonusHistory(userAddress, mid);
+//         lastValidIndex = mid;
+//         low = mid + 1;
+//       } catch (err) {
+//         high = mid - 1;
+//       }
+//     }
+
+//     if (lastValidIndex === -1) {
+//       return res.status(200).send({ data: [] }); // No bonuses
+//     }
+
+//     // Step 2: Fetch bonuses in reverse (latest first)
+//     const start = Math.max(0, lastValidIndex - MAX_BONUSES + 1);
+//     const indices = Array.from({ length: lastValidIndex - start + 1 }, (_, i) => start + i);
+
+//     const fetchPromises = indices.map(i =>
+//       contract.bonusHistory(userAddress, i).catch(() => null)
+//     );
+
+//     const results = await Promise.all(fetchPromises);
+
+//     const bonuses = results
+//       .filter(b => b !== null)
+//       .map(bonus => ({
+//         amount: ethers.utils.formatUnits(bonus.amount, 6),
+//         bonusType: bonus.bonusType,
+//         timestamp: Number(bonus.timestamp),
+//       }))
+//       .reverse(); // Latest first
+
+//     return res.status(200).send({ data: bonuses });
+//   } catch (error) {
+//     console.error("Error fetching bonus history:", error);
+//     return res.status(500).send({ message: "Internal server error" });
+//   }
+// };
+
 const userOf = async (userAddress) => {
   const userInfo = await contract.users(userAddress);
   let userInfoObj = {
@@ -723,6 +779,60 @@ const checkIsEligibleForReward = async (req,res) => {
 
 
 
+const synceBonusData = async () => {
+  try {
+    const users = await userModel.find({}, "walletAddress");
+    for (const user of users) {
+      const address = user.walletAddress.toLowerCase();
+      let index = 0;
+      while (true) {
+        try {
+          // Check if this index is already synced for the user
+          const exists = await Bonus.exists({ walletAddress: address, index });
+          console.log(`Checking index ${index} for ${address}: exists=${exists}`);
+          if (exists) {
+            index++;
+            continue;
+          }
+          // Fetch from smart contract
+          const bonus = await contract.bonusHistory(address, index);
+
+          console.log(`Fetched bonus for ${address} at index ${index}:`, bonus);
+
+          // Extract values safely from struct/tuple
+          const amount = ethers.utils.formatUnits(bonus.amount || bonus[0], 6);
+          const timestamp = Number((bonus.timestamp || bonus[1]).toString());
+          const bonusType = bonus.bonusType || bonus[2];
+          const fromSlot = Number((bonus.fromSlot || bonus[3]).toString());
+
+          // Create in MongoDB
+          const B = await Bonus.create({
+            walletAddress: address,
+            index,
+            amount: Number(amount),
+            bonusType,
+            timestamp,
+            fromSlot,
+          });
+
+          console.log(`Saved bonus for ${address} at index ${index}:`, B);
+          index++;
+        } catch (err) {
+          break;
+        }
+      }
+      console.log(`Synced bonuses for ${address}`);
+    }
+    console.log("All bonus sync complete.");
+    process.exit();
+  } catch (error) {
+    console.error("Bonus sync failed:", error);
+    process.exit(1);
+  }
+};
+
+// synceBonusData();
+
 
 
 
@@ -757,6 +867,7 @@ module.exports = {
     checkIsEligibleForRoyalty,
     checkIsEligibleForReward,
     adminActivateSlotInteranl,
+    synceBonusData,
 }
 
 

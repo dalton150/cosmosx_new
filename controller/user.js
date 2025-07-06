@@ -2,6 +2,7 @@ const User = require("../models/user");
 const utility = require("../utility/utility");
 const mongoose = require("mongoose");
 const claimModel = require("../models/claim");
+const Bonus = require("../models/bonus");
 
 const registerUser = async (req, res) => {
   try {
@@ -320,63 +321,74 @@ const getReferrerInternal = async (referredBy) => {
 };
 
 
-  const getCommunityTeam = async (req, res) => {
-    try {
-        const { walletAddress } = req.body;
-        const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+const getCommunityTeam = async (req, res) => {
+  try {
+    const { walletAddress } = req.body;
+    const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
 
-        if (!rootUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        let queue = [rootUser];
-        let levels = [];
-
-        while (queue.length > 0) {
-            let levelSize = queue.length;
-            let currentLevel = [];
-            let nextQueue = [];
-
-            for (let i = 0; i < levelSize; i++) {
-                const user = queue[i];
-
-                if (user) {
-                    currentLevel.push({
-                        walletAddress: user.walletAddress,
-                        referralCode: user.referralCode,
-                        referredBy: user.referredBy,
-                    });
-
-                    // Fetch children, add nulls if they don't exist
-                    const left = user.leftChild
-                        ? await User.findOne({ walletAddress: user.leftChild })
-                        : null;
-                    const right = user.rightChild
-                        ? await User.findOne({ walletAddress: user.rightChild })
-                        : null;
-
-                    nextQueue.push(left);
-                    nextQueue.push(right);
-                } else {
-                    // This is a null node, push two nulls to maintain structure
-                    currentLevel.push(null);
-                    nextQueue.push(null, null);
-                }
-            }
-
-            // Check if nextQueue has all nulls -> stop
-            const hasRealNodes = nextQueue.some(u => u !== null);
-            levels.push(currentLevel);
-
-            if (!hasRealNodes) break;
-            queue = nextQueue;
-        }
-
-        res.json({ root: walletAddress, downline: levels });
-    } catch (err) {
-        console.error('Error fetching downline users:', err);
-        res.status(500).json({ message: 'Server error' });
+    if (!rootUser) {
+      return res.status(404).json({ message: 'User not found' });
     }
+
+    let queue = [rootUser];
+    let levels = [];
+
+    while (queue.length > 0) {
+      const levelSize = queue.length;
+      const currentLevel = [];
+      const nextQueue = [];
+
+      // Collect all walletAddresses to fetch in batch
+      const walletAddressesToFetch = [];
+
+      for (let i = 0; i < levelSize; i++) {
+        const user = queue[i];
+
+        if (user) {
+          currentLevel.push({
+            walletAddress: user.walletAddress,
+            referralCode: user.referralCode,
+            referredBy: user.referredBy,
+          });
+
+          if (user.leftChild) walletAddressesToFetch.push(user.leftChild);
+          if (user.rightChild) walletAddressesToFetch.push(user.rightChild);
+        } else {
+          currentLevel.push(null);
+          nextQueue.push(null, null);
+        }
+      }
+
+      // Fetch all left/right children in bulk
+      const children = await User.find({ walletAddress: { $in: walletAddressesToFetch } }).lean();
+      const walletMap = new Map(children.map(u => [u.walletAddress, u]));
+
+      // Populate next level queue
+      for (let i = 0; i < levelSize; i++) {
+        const user = queue[i];
+
+        if (user) {
+          const left = user.leftChild ? walletMap.get(user.leftChild) || null : null;
+          const right = user.rightChild ? walletMap.get(user.rightChild) || null : null;
+
+          nextQueue.push(left);
+          nextQueue.push(right);
+        }
+      }
+
+      // Check if nextQueue has real users
+      const hasRealNodes = nextQueue.some(u => u !== null);
+      levels.push(currentLevel);
+
+      if (!hasRealNodes) break;
+      queue = nextQueue;
+    }
+
+    res.json({ root: walletAddress, downline: levels });
+  } catch (err) {
+    console.error('Error fetching downline users:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
 const getCommunitySize = async (req, res) => {
@@ -421,6 +433,46 @@ const getCommunitySize = async (req, res) => {
 };
 
 
+const getRecentBonus = async (req, res) => {
+  try {
+    const { userAddress} = req.body;
+    const { page = 1, limit = 10 } = req.query;
+
+    if (!userAddress) {
+      return res.status(400).json({ message: "userAddress is required" });
+    }
+
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const query = { walletAddress: userAddress.toLowerCase() };
+
+    const total = await Bonus.countDocuments(query);
+
+    const data = await Bonus.find(query)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(pageSize);
+
+    return res.status(200).json({
+      success: true,
+      data,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: pageSize,
+        pages: Math.ceil(total / pageSize),
+      },
+    });
+  } catch (err) {
+    console.error("Error in getRecentBonus:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
 
  
 
@@ -441,4 +493,5 @@ module.exports = {
      getCommunityTeam,
      getCommunitySize,
      getDirectTeam,
+     getRecentBonus,
 };
