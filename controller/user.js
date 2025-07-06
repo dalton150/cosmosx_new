@@ -436,7 +436,7 @@ const getCommunitySize = async (req, res) => {
 const getRecentBonus = async (req, res) => {
   try {
     const { userAddress} = req.body;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 100 } = req.query;
 
     if (!userAddress) {
       return res.status(400).json({ message: "userAddress is required" });
