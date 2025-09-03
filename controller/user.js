@@ -321,29 +321,99 @@ const getReferrerInternal = async (referredBy) => {
 };
 
 
+// const getCommunityTeam = async (req, res) => {
+//   try {
+//     const { walletAddress } = req.body;
+//     const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+
+//     if (!rootUser) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     let queue = [rootUser];
+//     let levels = [];
+
+//     while (queue.length > 0) {
+//       const levelSize = queue.length;
+//       const currentLevel = [];
+//       const nextQueue = [];
+
+//       // Collect all walletAddresses to fetch in batch
+//       const walletAddressesToFetch = [];
+
+//       for (let i = 0; i < levelSize; i++) {
+//         const user = queue[i];
+
+//         if (user) {
+//           currentLevel.push({
+//             walletAddress: user.walletAddress,
+//             referralCode: user.referralCode,
+//             referredBy: user.referredBy,
+//           });
+
+//           if (user.leftChild) walletAddressesToFetch.push(user.leftChild);
+//           if (user.rightChild) walletAddressesToFetch.push(user.rightChild);
+//         } else {
+//           currentLevel.push(null);
+//           nextQueue.push(null, null);
+//         }
+//       }
+
+//       // Fetch all left/right children in bulk
+//       const children = await User.find({ walletAddress: { $in: walletAddressesToFetch } }).lean();
+//       const walletMap = new Map(children.map(u => [u.walletAddress, u]));
+
+//       // Populate next level queue
+//       for (let i = 0; i < levelSize; i++) {
+//         const user = queue[i];
+
+//         if (user) {
+//           const left = user.leftChild ? walletMap.get(user.leftChild) || null : null;
+//           const right = user.rightChild ? walletMap.get(user.rightChild) || null : null;
+
+//           nextQueue.push(left);
+//           nextQueue.push(right);
+//         }
+//       }
+
+//       // Check if nextQueue has real users
+//       const hasRealNodes = nextQueue.some(u => u !== null);
+//       levels.push(currentLevel);
+
+//       if (!hasRealNodes) break;
+//       queue = nextQueue;
+//     }
+
+//     res.json({ root: walletAddress, downline: levels });
+//   } catch (err) {
+//     console.error('Error fetching downline users:', err);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// };
+
 const getCommunityTeam = async (req, res) => {
   try {
     const { walletAddress } = req.body;
-    const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+
+    const rootUser = await User.findOne(
+      { walletAddress: walletAddress.toLowerCase() },
+      "walletAddress referralCode referredBy leftChild rightChild"
+    ).lean();
 
     if (!rootUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     let queue = [rootUser];
-    let levels = [];
+    const levels = [];
+    const MAX_LEVELS = 15; // safety cutoff to avoid runaway growth
 
-    while (queue.length > 0) {
-      const levelSize = queue.length;
+    while (queue.length > 0 && levels.length < MAX_LEVELS) {
       const currentLevel = [];
-      const nextQueue = [];
-
-      // Collect all walletAddresses to fetch in batch
       const walletAddressesToFetch = [];
 
-      for (let i = 0; i < levelSize; i++) {
-        const user = queue[i];
-
+      // Collect all users at this level
+      for (const user of queue) {
         if (user) {
           currentLevel.push({
             walletAddress: user.walletAddress,
@@ -354,82 +424,91 @@ const getCommunityTeam = async (req, res) => {
           if (user.leftChild) walletAddressesToFetch.push(user.leftChild);
           if (user.rightChild) walletAddressesToFetch.push(user.rightChild);
         } else {
+          // keep position (null placeholder)
           currentLevel.push(null);
-          nextQueue.push(null, null);
         }
       }
 
-      // Fetch all left/right children in bulk
-      const children = await User.find({ walletAddress: { $in: walletAddressesToFetch } }).lean();
-      const walletMap = new Map(children.map(u => [u.walletAddress, u]));
-
-      // Populate next level queue
-      for (let i = 0; i < levelSize; i++) {
-        const user = queue[i];
-
-        if (user) {
-          const left = user.leftChild ? walletMap.get(user.leftChild) || null : null;
-          const right = user.rightChild ? walletMap.get(user.rightChild) || null : null;
-
-          nextQueue.push(left);
-          nextQueue.push(right);
-        }
-      }
-
-      // Check if nextQueue has real users
-      const hasRealNodes = nextQueue.some(u => u !== null);
       levels.push(currentLevel);
 
-      if (!hasRealNodes) break;
+      if (walletAddressesToFetch.length === 0) break;
+
+      // Fetch next level in bulk
+      const children = await User.find(
+        { walletAddress: { $in: walletAddressesToFetch } },
+        "walletAddress referralCode referredBy leftChild rightChild"
+      ).lean();
+
+      const walletMap = new Map(children.map((u) => [u.walletAddress, u]));
+
+      // Build next queue only from real users
+      const nextQueue = [];
+      for (const user of queue) {
+        if (user) {
+          nextQueue.push(user.leftChild ? walletMap.get(user.leftChild) || null : null);
+          nextQueue.push(user.rightChild ? walletMap.get(user.rightChild) || null : null);
+        }
+        // 🚨 removed the null → null expansion
+      }
+
+      // Stop if all nulls
+      if (!nextQueue.some((u) => u !== null)) break;
+
       queue = nextQueue;
     }
 
-    res.json({ root: walletAddress, downline: levels });
+    return res.json({ root: walletAddress, downline: levels });
   } catch (err) {
-    console.error('Error fetching downline users:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Error fetching downline users:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
+
 const getCommunitySize = async (req, res) => {
-    try {
-        const { walletAddress } = req.body;
-        const rootUser = await User.findOne({ walletAddress: walletAddress.toLowerCase() });
+  try {
+    const { walletAddress } = req.body;
+    const rootUser = await User.findOne(
+      { walletAddress: walletAddress.toLowerCase() },
+      "walletAddress leftChild rightChild"
+    ).lean();
 
-        if (!rootUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        let count = 0;
-        let queue = [rootUser];
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-
-            // Fetch left child if exists
-            if (current.leftChild) {
-                const left = await User.findOne({ walletAddress: current.leftChild });
-                if (left) {
-                    queue.push(left);
-                    count++;
-                }
-            }
-
-            // Fetch right child if exists
-            if (current.rightChild) {
-                const right = await User.findOne({ walletAddress: current.rightChild });
-                if (right) {
-                    queue.push(right);
-                    count++;
-                }
-            }
-        }
-
-        res.json({ walletAddress, downlineCount: count });
-    } catch (error) {
-        console.error("Error in getCommunitySize:", error);
-        res.status(500).json({ message: "Server error" });
+    if (!rootUser) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    // 🚀 Fetch all users in one query (only required fields)
+    const allUsers = await User.find(
+      {},
+      "walletAddress leftChild rightChild"
+    ).lean();
+
+    // Create quick lookup map
+    const userMap = new Map(allUsers.map((u) => [u.walletAddress, u]));
+
+    // BFS traversal without extra DB calls
+    let count = 0;
+    const queue = [rootUser];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+
+      if (current.leftChild && userMap.has(current.leftChild)) {
+        queue.push(userMap.get(current.leftChild));
+        count++;
+      }
+
+      if (current.rightChild && userMap.has(current.rightChild)) {
+        queue.push(userMap.get(current.rightChild));
+        count++;
+      }
+    }
+
+    return res.json({ walletAddress, downlineCount: count });
+  } catch (error) {
+    console.error("Error in getCommunitySize:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
 
