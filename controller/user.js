@@ -406,7 +406,7 @@ const getCommunityTeam = async (req, res) => {
 
     let queue = [rootUser];
     const levels = [];
-    const MAX_LEVELS = 15; // safety cutoff to avoid runaway growth
+    const MAX_LEVELS = 35; // safety cutoff to avoid runaway growth
 
     while (queue.length > 0 && levels.length < MAX_LEVELS) {
       const currentLevel = [];
